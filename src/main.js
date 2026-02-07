@@ -160,6 +160,9 @@ function main() {
             updatePlayer();
             handleGhostCollisions(timestamp);
             recordFrame(timestamp);
+
+            // Update pressure plates
+            updatePressurePlates();
         }
 
         // Clear and render

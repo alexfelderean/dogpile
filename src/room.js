@@ -4,8 +4,8 @@
 
 // 9x9 Grid Level Definition
 // 0 = empty
-// 1 = red cube
-// 2 = blue cube
+// 1 = red arrow (indicator)
+// 2 = pressure plate
 // 3 = green cube (exit/goal)
 // Add more object types as needed
 
@@ -32,8 +32,8 @@ levelGrid[5][6] = 2;  // Another blue cube
 
 // Object colors by type
 const OBJECT_COLORS = {
-    1: [0.9, 0.2, 0.2, 1.0],  // Red
-    2: [0.2, 0.4, 0.9, 1.0],  // Blue
+    1: [0.9, 0.2, 0.2, 1.0],  // Red (arrow)
+    2: [0.6, 0.5, 0.2, 1.0],  // Gold/bronze (pressure plate)
     3: [0.2, 0.9, 0.5, 1.0],  // Green (exit)
 };
 
@@ -209,8 +209,22 @@ function createRoomGeometry() {
             const color = OBJECT_COLORS[objectType] || [0.5, 0.5, 0.5, 1.0];
 
             if (objectType === 1) {
-                // Type 1: Downward-pointing arrow on floor
+                // Type 1: Downward-pointing arrow
                 addArrow(worldX, worldZ, color);
+            } else if (objectType === 2) {
+                // Type 2: Pressure plate (flat on floor)
+                createPressurePlate(row, col);
+                const plateSize = CELL_SIZE * 0.7;
+                const plateHeight = 0.08;
+                addBox(
+                    worldX - plateSize / 2,
+                    0.01,
+                    worldZ - plateSize / 2,
+                    plateSize,
+                    plateHeight,
+                    plateSize,
+                    color
+                );
             } else {
                 // Other types: Regular cube
                 addBox(
