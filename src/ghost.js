@@ -369,6 +369,16 @@ function getGhosts() {
     return ghosts;
 }
 
+// Clear all ghosts and recording (for level transitions)
+function clearGhosts() {
+    ghosts.length = 0;
+    currentRecording = [];
+    timeLoop.waitingForInput = true;
+    timeLoop.startTime = 0;
+    timeLoop.lastRecordTime = 0;
+    updateGhostCountUI();
+}
+
 function getGhostModelMatrixForFrame(frame) {
     getGhostModelMatrix(_ghostModelMatrix, frame.x, frame.y, frame.z, frame.yaw);
     return _ghostModelMatrix;

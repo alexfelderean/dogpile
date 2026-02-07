@@ -194,6 +194,8 @@ function updateDoorCollision() {
             levelNumber++;
             loadLevel("levels/l" + levelNumber).then(() => {
                 console.log('Level ' + levelNumber + ' loaded!');
+                // Clear ghosts for the new level
+                clearGhosts();
                 // Rebuild room geometry with new level data (will reset transition to -40)
                 if (window.rebuildRoomGeometry) {
                     window.rebuildRoomGeometry();
