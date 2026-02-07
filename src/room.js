@@ -243,7 +243,7 @@ export function createRoomGeometry() {
             const floorY = height * CELL_SIZE;
             const color = OBJECT_COLORS[objectType] || [0.5, 0.5, 0.5, 1.0];
             if (height > 0) {
-                const terrainColor = [0.45, 0.47, 0.52, 1.0];
+                const terrainColor = [0.55, 0.35, 0.2, 1.0];
                 const x = worldX - cubeSize / 2, z = worldZ - cubeSize / 2;
                 const w = cubeSize, d = cubeSize, h = floorY;
                 addQuad([x, 0, z + d], [x + w, 0, z + d], [x + w, h, z + d], [x, h, z + d], terrainColor);
