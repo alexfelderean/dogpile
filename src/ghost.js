@@ -430,7 +430,7 @@ export function createShadowGeometry() {
     const y = 0.02;
     const shadowColor = [0.0, 0.0, 0.0, 0.4];
     const positions = new Float32Array([
-        -half, y, -half, half, y, -half, half, y, half, -half, y, half
+        -halfX, y, -halfZ, halfX, y, -halfZ, halfX, y, halfZ, -halfX, y, halfZ
     ]);
     const colors = new Float32Array([
         ...shadowColor, ...shadowColor, ...shadowColor, ...shadowColor
