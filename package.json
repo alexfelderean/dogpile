@@ -3,9 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "build": "esbuild src/main.js --bundle --minify --sourcemap --outfile=dist/bundle.js",
-    "dev": "esbuild src/main.js --bundle --sourcemap --outfile=dist/bundle.js --watch",
-    "buildnomap": "esbuild src/main.js --bundle --minify --outfile=dist/bundle.js"
+    "build": "esbuild src/main.js --bundle --minify --target=es2020 --drop:console --drop:debugger --legal-comments=none --outfile=dist/bundle.js && npx roadroller dist/bundle.js -o dist/bundle.min.js && xcopy /Y /E /I levels dist\\levels && xcopy /Y /E /I textures dist\\textures && copy /Y dist.html dist\\index.html",
+    "dev": "esbuild src/main.js --bundle --sourcemap --outfile=dist/bundle.js --watch"
   },
   "repository": {
     "type": "git",

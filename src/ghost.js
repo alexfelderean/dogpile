@@ -128,22 +128,22 @@ export function handleGhostCollisions(timestamp) {
 }
 
 function updateTimerUI(elapsed) {
-    const timerFill = document.getElementById('timer-fill');
+    const timerFill = document.getElementById('tf');
     if (timeLoop.waitingForInput) {
         timerFill.style.width = '100%';
-        timerFill.classList.remove('warning');
-        timerFill.classList.add('waiting');
+        timerFill.classList.remove('w');
+        timerFill.classList.add('wt');
         return;
     }
-    timerFill.classList.remove('waiting');
+    timerFill.classList.remove('wt');
     const remaining = Math.max(0, 1 - elapsed / timeLoop.duration);
     timerFill.style.width = (remaining * 100) + '%';
-    if (remaining < 0.25) timerFill.classList.add('warning');
-    else timerFill.classList.remove('warning');
+    if (remaining < 0.25) timerFill.classList.add('w');
+    else timerFill.classList.remove('w');
 }
 
 function updateGhostCountUI() {
-    document.getElementById('ghost-count').textContent = `Ghosts: ${ghosts.length}/${MAX_GHOSTS}`;
+    document.getElementById('gc').textContent = `Ghosts: ${ghosts.length}/${MAX_GHOSTS}`;
 }
 
 export function updateTimeLoop(timestamp) {

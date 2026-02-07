@@ -53,9 +53,6 @@ export function updatePressurePlates() {
     levelFlags.allPlatesPressed = (pressedCount === pressurePlates.length && pressurePlates.length > 0);
 }
 
-export function getPressurePlates() { return pressurePlates; }
-export function getLevelFlags() { return levelFlags; }
-
 export function isPlatePressed(gridRow, gridCol) {
     for (const plate of pressurePlates)
         if (plate.gridRow === gridRow && plate.gridCol === gridCol) return plate.isPressed;
@@ -63,4 +60,3 @@ export function isPlatePressed(gridRow, gridCol) {
 }
 
 export function isChannelActive(channel) { return activeChannels.has(channel); }
-export function getActiveChannels() { return Array.from(activeChannels); }
