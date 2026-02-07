@@ -270,7 +270,7 @@ function updateDoorCollision() {
 
         const loadNextLevel = () => {
             levelNumber++;
-            loadLevel("levels/l" + levelNumber).then(() => {
+            loadLevel("levels/l" + levelNumber + ".bin").then(() => {
                 console.log('Level ' + levelNumber + ' loaded!');
                 // Clear ghosts for the new level
                 clearGhosts();

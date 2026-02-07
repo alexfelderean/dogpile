@@ -53,7 +53,7 @@ const fsSource = `
 // =============================================================================
 async function main() {
     // Load level first
-    await loadLevel('levels/l1');
+    await loadLevel('levels/l1.bin');
 
     const canvas = document.getElementById('glCanvas');
 
