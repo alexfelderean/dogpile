@@ -158,6 +158,40 @@
             display: block;
         }
 
+        /* Jump Button */
+        #jump-button {
+            position: fixed;
+            bottom: 60px;
+            left: 200px;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            border: 3px solid rgba(255, 255, 255, 0.4);
+            display: none;
+            z-index: 20;
+            touch-action: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: bold;
+            user-select: none;
+        }
+
+        #jump-button.pressed {
+            background: rgba(255, 255, 255, 0.4);
+            transform: scale(0.95);
+        }
+
+        @media (hover: none) and (pointer: coarse) {
+            #jump-button {
+                display: flex;
+            }
+        }
+
         .hidden {
             display: none !important;
         }
@@ -170,7 +204,8 @@
         <p>Click to start</p>
         <div class="instructions">
             WASD / Arrow Keys - Move<br>
-            Touch: Use joystick
+            Space - Jump<br>
+            Touch: Use joystick + button
         </div>
     </div>
     <div id="timer-bar" class="hidden">
@@ -184,6 +219,8 @@
             <div id="joystick-knob"></div>
         </div>
     </div>
+    
+    <button id="jump-button" class="hidden">JUMP</button>
 
     <canvas id="glCanvas"></canvas>
     <script src="src/math.js"></script>
