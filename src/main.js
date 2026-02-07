@@ -1,6 +1,6 @@
-import { mat4Orthographic, mat4IsometricView, mat4Identity, calculateIsometricFitBounds, _viewMatrix, _projMatrix, compileShader } from './math.js';
+import { mat4Orthographic, mat4IsometricView, mat4Identity, mat4Translate, mat4RotateY, calculateIsometricFitBounds, _viewMatrix, _projMatrix, compileShader } from './math.js';
 import { player, setupPlayerInput, updatePlayer, getPlayerPosition, getPlayerYaw, hasPlayerInput, isPlayerActive, resetPlayer } from './player.js';
-import { startTimeLoop, isWaitingForInput, isTimeLoopRunning, setTimeLoopRunning, updateTimeLoop, recordFrame, handleGhostCollisions, getGhosts, getGhostFrame, getGhostModelMatrix, getGhostModelMatrixForFrame, getGhostOpacity, clearGhosts, createGhostGeometry, createPlayerGeometry, createShadowGeometry } from './ghost.js';
+import { startTimeLoop, isWaitingForInput, isTimeLoopRunning, setTimeLoopRunning, updateTimeLoop, recordFrame, handleGhostCollisions, getGhosts, getGhostFrame, getGhostModelMatrix, getGhostModelMatrixForFrame, getGhostOpacity, clearGhosts, getCurrentPlayerColor, createPlayerGeometry, createPlayerLegGeometry, createPlayerTailGeometry, createPlayerGeometryBlack, createPlayerGeometryWheaten, createPlayerGeometryBrindle, createPlayerLegGeometryBlack, createPlayerLegGeometryWheaten, createPlayerLegGeometryBrindle, createPlayerTailGeometryBlack, createPlayerTailGeometryWheaten, createPlayerTailGeometryBrindle, createShadowGeometry, createGhostGeometryBlack, createGhostGeometryWheaten, createGhostGeometryBrindle, createGhostLegGeometryBlack, createGhostLegGeometryWheaten, createGhostLegGeometryBrindle, createGhostTailGeometryBlack, createGhostTailGeometryWheaten, createGhostTailGeometryBrindle, LEG_POSITIONS, LEG_PIVOT_Y, TAIL_PIVOT_Y, TAIL_OFFSET_Z, DOG_VISUAL_SCALE } from './ghost.js';
 import { updatePressurePlates } from './pressureplate.js';
 import { updatePistons, handlePistonCollisions, isPistonAnimating } from './piston.js';
 import { loadLevel, createRoomGeometry, createArrowGeometry, createWallGeometry, handleLevelTileCollisions, updateDoorCollision, updateDoorLockState, GRID_SIZE, CELL_SIZE, ROOM_HEIGHT } from './room.js';
@@ -33,7 +33,7 @@ async function main() {
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return;
     let room = createRoomGeometry(), arrow = createArrowGeometry(), wallGeom = createWallGeometry();
-    const ghostGeom = createGhostGeometry(), playerGeom = createPlayerGeometry(), shadowGeom = createShadowGeometry();
+    const playerGeom = createPlayerGeometry(), shadowGeom = createShadowGeometry();
     let indexCount = room.indexCount, arrowIndexCount = arrow.indexCount;
     updateWallBuffers(gl, wallGeom);
     let floorGeom = createFloorGeometry();
@@ -111,36 +111,74 @@ async function main() {
     const arrowIdxBuf = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, arrowIdxBuf);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, arrow.indices, gl.STATIC_DRAW);
-    const ghostPosBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, ghostPosBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, ghostGeom.positions, gl.STATIC_DRAW);
-    const ghostColBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, ghostColBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, ghostGeom.colors, gl.STATIC_DRAW);
-    const ghostIdxBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ghostIdxBuf);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, ghostGeom.indices, gl.STATIC_DRAW);
-    const ghostNormBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, ghostNormBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, ghostGeom.normals, gl.STATIC_DRAW);
-    const ghostTexCoordBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, ghostTexCoordBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, ghostGeom.texCoords, gl.STATIC_DRAW);
-    const playerPosBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, playerPosBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, playerGeom.positions, gl.STATIC_DRAW);
-    const playerColBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, playerColBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, playerGeom.colors, gl.STATIC_DRAW);
-    const playerIdxBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerIdxBuf);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, playerGeom.indices, gl.STATIC_DRAW);
-    const playerNormBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, playerNormBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, playerGeom.normals, gl.STATIC_DRAW);
-    const playerTexCoordBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, playerTexCoordBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, playerGeom.texCoords, gl.STATIC_DRAW);
+    // Ghost Geometries (3 Types)
+    const ghostGeoms = [createGhostGeometryBlack(), createGhostGeometryWheaten(), createGhostGeometryBrindle()];
+    const ghostPosBufs = [], ghostColBufs = [], ghostNormBufs = [], ghostIdxBufs = [], ghostIndexCounts = [];
+    for (const g of ghostGeoms) {
+        const pb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, pb); gl.bufferData(gl.ARRAY_BUFFER, g.positions, gl.STATIC_DRAW); ghostPosBufs.push(pb);
+        const cb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cb); gl.bufferData(gl.ARRAY_BUFFER, g.colors, gl.STATIC_DRAW); ghostColBufs.push(cb);
+        const nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, nb); gl.bufferData(gl.ARRAY_BUFFER, g.normals, gl.STATIC_DRAW); ghostNormBufs.push(nb);
+        const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g.indices, gl.STATIC_DRAW); ghostIdxBufs.push(ib);
+        ghostIndexCounts.push(g.indexCount);
+    }
+    
+    // Ghost Legs (3 Types)
+    const ghostLegGeoms = [createGhostLegGeometryBlack(), createGhostLegGeometryWheaten(), createGhostLegGeometryBrindle()];
+    const ghostLegPosBufs = [], ghostLegColBufs = [], ghostLegNormBufs = [], ghostLegIdxBufs = [];
+    for (const g of ghostLegGeoms) {
+        const pb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, pb); gl.bufferData(gl.ARRAY_BUFFER, g.positions, gl.STATIC_DRAW); ghostLegPosBufs.push(pb);
+        const cb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cb); gl.bufferData(gl.ARRAY_BUFFER, g.colors, gl.STATIC_DRAW); ghostLegColBufs.push(cb);
+        const nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, nb); gl.bufferData(gl.ARRAY_BUFFER, g.normals, gl.STATIC_DRAW); ghostLegNormBufs.push(nb);
+        const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g.indices, gl.STATIC_DRAW); ghostLegIdxBufs.push(ib);
+    }
+    const ghostLegIndexCount = ghostLegGeoms[0].indexCount;
+
+    // Ghost Tails (3 Types)
+    const ghostTailGeoms = [createGhostTailGeometryBlack(), createGhostTailGeometryWheaten(), createGhostTailGeometryBrindle()];
+    const ghostTailPosBufs = [], ghostTailColBufs = [], ghostTailNormBufs = [], ghostTailIdxBufs = [];
+    for (const g of ghostTailGeoms) {
+        const pb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, pb); gl.bufferData(gl.ARRAY_BUFFER, g.positions, gl.STATIC_DRAW); ghostTailPosBufs.push(pb);
+        const cb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cb); gl.bufferData(gl.ARRAY_BUFFER, g.colors, gl.STATIC_DRAW); ghostTailColBufs.push(cb);
+        const nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, nb); gl.bufferData(gl.ARRAY_BUFFER, g.normals, gl.STATIC_DRAW); ghostTailNormBufs.push(nb);
+        const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g.indices, gl.STATIC_DRAW); ghostTailIdxBufs.push(ib);
+    }
+    const ghostTailIndexCount = ghostTailGeoms[0].indexCount;
+    
+    // Player Geometries (3 Types - all with scarf)
+    const playerGeoms = [createPlayerGeometryBlack(), createPlayerGeometryWheaten(), createPlayerGeometryBrindle()];
+    const playerPosBufs = [], playerColBufs = [], playerNormBufs = [], playerIdxBufs = [], playerIndexCounts = [];
+    for (const g of playerGeoms) {
+        const pb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, pb); gl.bufferData(gl.ARRAY_BUFFER, g.positions, gl.STATIC_DRAW); playerPosBufs.push(pb);
+        const cb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cb); gl.bufferData(gl.ARRAY_BUFFER, g.colors, gl.STATIC_DRAW); playerColBufs.push(cb);
+        const nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, nb); gl.bufferData(gl.ARRAY_BUFFER, g.normals, gl.STATIC_DRAW); playerNormBufs.push(nb);
+        const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g.indices, gl.STATIC_DRAW); playerIdxBufs.push(ib);
+        playerIndexCounts.push(g.indexCount);
+    }
+
+    // Player Legs (3 Types)
+    const playerLegGeoms = [createPlayerLegGeometryBlack(), createPlayerLegGeometryWheaten(), createPlayerLegGeometryBrindle()];
+    const playerLegPosBufs = [], playerLegColBufs = [], playerLegNormBufs = [], playerLegIdxBufs = [];
+    for (const g of playerLegGeoms) {
+        const pb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, pb); gl.bufferData(gl.ARRAY_BUFFER, g.positions, gl.STATIC_DRAW); playerLegPosBufs.push(pb);
+        const cb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cb); gl.bufferData(gl.ARRAY_BUFFER, g.colors, gl.STATIC_DRAW); playerLegColBufs.push(cb);
+        const nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, nb); gl.bufferData(gl.ARRAY_BUFFER, g.normals, gl.STATIC_DRAW); playerLegNormBufs.push(nb);
+        const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g.indices, gl.STATIC_DRAW); playerLegIdxBufs.push(ib);
+    }
+    const playerLegIndexCount = playerLegGeoms[0].indexCount;
+
+    // Player Tails (3 Types)
+    const playerTailGeoms = [createPlayerTailGeometryBlack(), createPlayerTailGeometryWheaten(), createPlayerTailGeometryBrindle()];
+    const playerTailPosBufs = [], playerTailColBufs = [], playerTailNormBufs = [], playerTailIdxBufs = [];
+    for (const g of playerTailGeoms) {
+        const pb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, pb); gl.bufferData(gl.ARRAY_BUFFER, g.positions, gl.STATIC_DRAW); playerTailPosBufs.push(pb);
+        const cb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cb); gl.bufferData(gl.ARRAY_BUFFER, g.colors, gl.STATIC_DRAW); playerTailColBufs.push(cb);
+        const nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, nb); gl.bufferData(gl.ARRAY_BUFFER, g.normals, gl.STATIC_DRAW); playerTailNormBufs.push(nb);
+        const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g.indices, gl.STATIC_DRAW); playerTailIdxBufs.push(ib);
+    }
+    const playerTailIndexCount = playerTailGeoms[0].indexCount;
+    
+    // Animation state
+    let playerLegPhase = 0, lastPlayerPos = [0, 0, 0];
     const shadowPosBuf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, shadowPosBuf);
     gl.bufferData(gl.ARRAY_BUFFER, shadowGeom.positions, gl.STATIC_DRAW);
@@ -194,7 +232,6 @@ async function main() {
     gl.uniform3f(uAmbientColor, 0.5, 0.5, 0.55);
     gl.uniform3f(uLightColor, 0.6, 0.58, 0.5);
     gl.uniform1f(u_globalAlpha, 1.0);
-    const ghostIndexCount = ghostGeom.indexCount;
     const playerIndexCount = playerGeom.indexCount;
     setupPlayerInput(canvas, () => { if (isWaitingForInput()) { startTimeLoop(performance.now()); return true; } return false; });
     const roomModelMatrix = new Float32Array(16);
@@ -292,7 +329,7 @@ async function main() {
         gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, shadowIdxBuf);
         // Player shadow
-        getGhostModelMatrix(characterModelMatrix, playerPos[0], 0, playerPos[2], 0);
+        getGhostModelMatrix(characterModelMatrix, playerPos[0], 0, playerPos[2], getPlayerYaw());
         characterModelMatrix[13] += levelTransitionY;
         gl.uniformMatrix4fv(uModelMatrix, false, characterModelMatrix);
         gl.drawElements(gl.TRIANGLES, shadowIndexCount, gl.UNSIGNED_SHORT, 0);
@@ -301,7 +338,7 @@ async function main() {
         for (const ghost of ghostListForShadows) {
             const frame = getGhostFrame(ghost);
             if (frame) {
-                getGhostModelMatrix(characterModelMatrix, frame.x, 0, frame.z, 0);
+                getGhostModelMatrix(characterModelMatrix, frame.x, 0, frame.z, frame.yaw);
                 characterModelMatrix[13] += levelTransitionY;
                 gl.uniformMatrix4fv(uModelMatrix, false, characterModelMatrix);
                 gl.drawElements(gl.TRIANGLES, shadowIndexCount, gl.UNSIGNED_SHORT, 0);
@@ -309,9 +346,10 @@ async function main() {
         }
         // ---------------------------
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, playerPosBuf);
+        const currentPlayerColor = getCurrentPlayerColor();
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerPosBufs[currentPlayerColor]);
         gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
-        gl.bindBuffer(gl.ARRAY_BUFFER, playerNormBuf);
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerNormBufs[currentPlayerColor]);
         gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
 
         // --- PLAYER OUTLINE PASS ---
@@ -330,58 +368,312 @@ async function main() {
         outlineMatrix[8] *= outlineScale; outlineMatrix[9] *= outlineScale; outlineMatrix[10] *= outlineScale;
 
         gl.uniformMatrix4fv(uModelMatrix, false, outlineMatrix);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerIdxBuf);
-        gl.drawElements(gl.TRIANGLES, playerIndexCount, gl.UNSIGNED_SHORT, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerIdxBufs[currentPlayerColor]);
+        gl.drawElements(gl.TRIANGLES, playerIndexCounts[currentPlayerColor], gl.UNSIGNED_SHORT, 0);
 
         gl.disable(gl.CULL_FACE);
         gl.cullFace(gl.BACK);
         gl.enableVertexAttribArray(aColor);
         // ---------------------------
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, playerColBuf);
+        // Helper to render legs
+        function renderLegs(pos, yaw, legPhase, isGhost, opacity = 1.0, type = 0) {
+            const legGeomIndexCount = isGhost ? ghostLegIndexCount : playerLegIndexCount;
+            const legBufs = isGhost ? 
+                { pos: ghostLegPosBufs[type], norm: ghostLegNormBufs[type], col: ghostLegColBufs[type], idx: ghostLegIdxBufs[type] } :
+                { pos: playerLegPosBufs[currentPlayerColor], norm: playerLegNormBufs[currentPlayerColor], col: playerLegColBufs[currentPlayerColor], idx: playerLegIdxBufs[currentPlayerColor] };
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, legBufs.pos);
+            gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, legBufs.norm);
+            gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, legBufs.col);
+            gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, legBufs.idx);
+
+            if (isGhost) gl.uniform1f(u_globalAlpha, opacity);
+
+            for (const leg of LEG_POSITIONS) {
+                const legMatrix = new Float32Array(16);
+                mat4Identity(legMatrix);
+                
+                // 1. Translation to position (x, y, z)
+                // 2. Rotation (yaw)
+                // 3. Leg offset (relative to body center)
+                // 4. Leg swing rotation (around pivot)
+                
+                // We'll construct this by combining transforms:
+                // Global = Translate(pos) * Rotate(yaw) * Translate(legOffset) * Translate(0, pivotY, 0) * Rotate(swing) * Translate(0, -pivotY, 0)
+                
+                // But since we have a simple hierarchy, we can do it step-by-step or use a matrix stack. 
+                // Let's use getGhostModelMatrix as a base for body transform (pos + yaw).
+                getGhostModelMatrix(legMatrix, pos[0], pos[1], pos[2], yaw);
+                legMatrix[13] += levelTransitionY;
+
+                // Apply leg offset relative to body
+                // We need to rotate the offset by the yaw to get world space offset
+                const c = Math.cos(yaw), s = Math.sin(yaw);
+                const wx = leg.x * c - leg.z * s;
+                const wz = leg.x * s + leg.z * c;
+                
+                legMatrix[12] += wx;
+                legMatrix[14] += wz;
+
+                // Calculate swing angle
+                const swingAmplitude = 0.6;
+                const swingAngle = Math.sin(legPhase + leg.phase) * swingAmplitude;
+                
+                // Apply swing rotation around X axis (local leg space)
+                // Since leg geometry is axis-aligned, we can rotate around the local X axis relative to the leg pivot
+                // Pivot is at LEG_PIVOT_Y relative to ground (0)
+                
+                // We need to rotate around the pivot point. 
+                // M = M * Translate(0, pivot, 0) * RotateX(angle) * Translate(0, -pivot, 0)
+                
+                // To avoid complex matrix math, let's just create a rotation matrix and multiply
+                // But we are in a simple engine.
+                
+                // Let's manually apply the rotation to the matrix
+                // The current matrix M puts us at the leg's top attachment point (approximately)
+                // Let's adjust the indices directly? No, that's hard with the rotation.
+                
+                // Create a local rotation matrix for the leg swing
+                const swingMatrix = new Float32Array(16);
+                mat4Identity(swingMatrix);
+                
+                // Translate to pivot
+                swingMatrix[13] = LEG_PIVOT_Y;
+                
+                // Rotate X
+                const sc = Math.cos(swingAngle), ss = Math.sin(swingAngle);
+                const rotMatrix = new Float32Array(16);
+                mat4Identity(rotMatrix);
+                rotMatrix[5] = sc; rotMatrix[6] = ss;
+                rotMatrix[9] = -ss; rotMatrix[10] = sc;
+                
+                // Translate back
+                const transBack = new Float32Array(16);
+                mat4Identity(transBack);
+                transBack[13] = -LEG_PIVOT_Y;
+                
+                // Combine: Swing * Rot * Back
+                // Since we want to apply this TO the existing transform:
+                // Final = BodyTransform * OffsetTransform * SwingTransform
+                
+                // Simplified approach:
+                // The leg geometry is centered at (0, -height/2, 0) relative to its origin? 
+                // No, createLegGeometry creates it with offset X/Z but centered Y?
+                // Actually createLegGeometry applies the offset X/Z and puts Y from -height/2 to +height/2 ? 
+                // No, check ghost.js: 
+                // addBoxToArrays(..., offsetX, -legHeight / 2, offsetZ, ...)
+                // So it's already offset in X/Z and centered vertically at -height/2 relative to origin 0.
+                // Wait, createLegGeometry uses offsets passed to it?
+                // createLegGeometry([..], 0, 0) -> offsets are 0.
+                // So the geometry is a box from -w/2 to w/2 in X/Z, and -h to 0 in Y?
+                // addBoxToArrays(..., 0, -legHeight/2, 0, ...) -> box center is at y = -legHeight/2. Size is legHeight.
+                // So y ranges from -legHeight to 0. Correct.
+                // So the geometry origin (0,0,0) is the top of the leg (pivot point).
+                
+                // So we just need to:
+                // 1. Translate to body position + body rotation
+                // 2. Translate by leg offset (rotated by body yaw)
+                // 3. Rotate by swing angle (X axis)
+                // 4. Draw
+                
+                // Construct matrix:
+                // We have legMatrix which is at Body Pos + rotated offset.
+                // Now just rotate X local.
+                
+                // To rotate X local (which is axis perpendicular to direction facing? No, yaw rotates Y)
+                // If yaw is 0, dog faces -Z. X is right.
+                // Leg swing is around X axis.
+                // So we just rotate around global X? No, local X.
+                // Since we applied yaw, the local X is rotated.
+                // The matrix already has the rotation. We can just multiply a rotation matrix?
+                
+                // If M is the model matrix so far (Pos * RotY), then M * RotX will rotate around the *local* X axis?
+                // Yes, if we multiply on the right.
+                
+                // M_new = M * RotX(swing)
+                
+                // Manual multiplication of M * RotX
+                // RotX: 
+                // 1  0  0  0
+                // 0  c  s  0
+                // 0 -s  c  0
+                // 0  0  0  1
+                
+                // Col 0: M[0], M[1], M[2], M[3] (unchanged)
+                // Col 1: M[4]*c + M[8]*-s, ...
+                // Col 2: M[4]*s + M[8]*c, ...
+                // Col 3: M[12]... (unchanged)
+                
+                const m = legMatrix;
+                const m4 = m[4], m5 = m[5], m6 = m[6], m7 = m[7];
+                const m8 = m[8], m9 = m[9], m10 = m[10], m11 = m[11];
+                
+                // Rotate around pivot Y (which is the origin of the geometry)
+                // But wait, the geometry is at (0, -h/2, 0) relative to 0? 
+                // Yes, 0 is the top. So standard RotX works perfect.
+                
+                // Apply rotation
+                m[4] = m4 * sc + m8 * ss;
+                m[5] = m5 * sc + m9 * ss;
+                m[6] = m6 * sc + m10 * ss;
+                m[7] = m7 * sc + m11 * ss;
+                
+                m[8] = m4 * -ss + m8 * sc;
+                m[9] = m5 * -ss + m9 * sc;
+                m[10] = m6 * -ss + m10 * sc;
+                m[11] = m7 * -ss + m11 * sc;
+                
+                // Now translate Y up to the pivot point in world space?
+                // The body render puts the body at `pos`.
+                // `pos` is the bottom center of the collision box? 
+                // No, player.position is ... looks like floor level?
+                // In ghost.js createDogBodyGeometry: bodyY = groundY + legHeight + bodyHeight/2.
+                // So body is elevated.
+                // The leg geometry origin is the top of the leg.
+                // The leg top should be at groundY + legHeight.
+                // So we need to translate up by LEG_PIVOT_Y.
+                // But we already included that in the geometry?
+                // No, created geometry is local.
+                // We simply need to translate the leg up to the pivot height relative to the ground.
+                m[13] += LEG_PIVOT_Y; 
+                
+                gl.uniformMatrix4fv(uModelMatrix, false, m);
+                gl.drawElements(gl.TRIANGLES, legGeomIndexCount, gl.UNSIGNED_SHORT, 0);
+            }
+        }
+
+        // Setup player legs
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerPosBufs[currentPlayerColor]);
+        gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerNormBufs[currentPlayerColor]);
+        gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerColBufs[currentPlayerColor]);
         gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(aTexCoord);
-        gl.bindBuffer(gl.ARRAY_BUFFER, playerTexCoordBuf);
-        gl.vertexAttribPointer(aTexCoord, 2, gl.FLOAT, false, 0, 0);
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, playerTexture);
-        gl.uniform1i(uTexture, 0);
-        gl.uniform1i(uUseTexture, 1);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerIdxBuf);
-        getGhostModelMatrix(characterModelMatrix, playerPos[0], playerPos[1], playerPos[2], getPlayerYaw());
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerIdxBufs[currentPlayerColor]);
+
+        // Update player leg animation
+        const px = playerPos[0], py = playerPos[1], pz = playerPos[2];
+        const distMoved = Math.hypot(px - lastPlayerPos[0], pz - lastPlayerPos[2]);
+        if (distMoved > 0.001) {
+            playerLegPhase += distMoved * 4.5;
+        } else {
+            // Return to neutral
+            playerLegPhase = playerLegPhase % (Math.PI * 2);
+            if (playerLegPhase > Math.PI) playerLegPhase += (2 * Math.PI - playerLegPhase) * 0.1;
+            else playerLegPhase -= playerLegPhase * 0.1;
+        }
+        lastPlayerPos = [px, py, pz];
+
+        // Player Body
+        gl.uniform1i(uUseTexture, 0);
+        getGhostModelMatrix(characterModelMatrix, px, py, pz, getPlayerYaw());
         characterModelMatrix[13] += levelTransitionY;
         gl.uniformMatrix4fv(uModelMatrix, false, characterModelMatrix);
-        gl.drawElements(gl.TRIANGLES, playerIndexCount, gl.UNSIGNED_SHORT, 0);
-        gl.uniform1i(uUseTexture, 0);
-        gl.disableVertexAttribArray(aTexCoord);
+        gl.drawElements(gl.TRIANGLES, playerIndexCounts[currentPlayerColor], gl.UNSIGNED_SHORT, 0);
+        
+        // Player Legs
+        renderLegs(playerPos, getPlayerYaw(), playerLegPhase, false);
+
+        // Player Tail
+        const tailPhase = timestamp * 0.008;
+        const tailWag = Math.sin(tailPhase) * 0.4;
+        const tailMatrix = new Float32Array(16);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerTailPosBufs[currentPlayerColor]);
+        gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerTailNormBufs[currentPlayerColor]);
+        gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerTailColBufs[currentPlayerColor]);
+        gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerTailIdxBufs[currentPlayerColor]);
+        
+        getGhostModelMatrix(tailMatrix, px, py, pz, getPlayerYaw());
+        tailMatrix[13] += levelTransitionY;
+        mat4Translate(tailMatrix, 0, TAIL_PIVOT_Y, TAIL_OFFSET_Z);
+        mat4RotateY(tailMatrix, tailWag);
+        gl.uniformMatrix4fv(uModelMatrix, false, tailMatrix);
+        gl.drawElements(gl.TRIANGLES, playerTailIndexCount, gl.UNSIGNED_SHORT, 0);
+
+        // Ghosts
         const ghostList = getGhosts();
         if (ghostList.length > 0) {
-            gl.bindBuffer(gl.ARRAY_BUFFER, ghostPosBuf);
-            gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
-            gl.bindBuffer(gl.ARRAY_BUFFER, ghostNormBuf);
-            gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
-            gl.bindBuffer(gl.ARRAY_BUFFER, ghostColBuf);
-            gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
-            gl.enableVertexAttribArray(aTexCoord);
-            gl.bindBuffer(gl.ARRAY_BUFFER, ghostTexCoordBuf);
-            gl.vertexAttribPointer(aTexCoord, 2, gl.FLOAT, false, 0, 0);
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, playerTexture);
-            gl.uniform1i(uTexture, 0);
-            gl.uniform1i(uUseTexture, 1);
-            gl.uniform1f(u_globalAlpha, getGhostOpacity(timestamp));
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ghostIdxBuf);
-            for (const ghost of ghostList) {
-                const frame = getGhostFrame(ghost);
-                if (frame) {
-                    const modelMatrix = getGhostModelMatrixForFrame(frame);
-                    modelMatrix[13] += levelTransitionY;
-                    gl.uniformMatrix4fv(uModelMatrix, false, modelMatrix);
-                    gl.drawElements(gl.TRIANGLES, ghostIndexCount, gl.UNSIGNED_SHORT, 0);
+            for (let type = 0; type < 3; type++) {
+                // Ghost Bodies
+                gl.bindBuffer(gl.ARRAY_BUFFER, ghostPosBufs[type]);
+                gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ARRAY_BUFFER, ghostNormBufs[type]);
+                gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ARRAY_BUFFER, ghostColBufs[type]);
+                gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ghostIdxBufs[type]);
+                
+                gl.uniform1i(uUseTexture, 0);
+                
+                for (const ghost of ghostList) {
+                    if ((ghost.colorType || 0) !== type) continue;
+                    
+                    const opacity = getGhostOpacity(timestamp);
+                    gl.uniform1f(u_globalAlpha, opacity);
+                    
+                    const frame = getGhostFrame(ghost);
+                    if (frame) {
+                        // Update ghost leg phase
+                        if (!ghost.legPhase) ghost.legPhase = 0;
+                        if (ghost.lastX !== undefined) {
+                            const dist = Math.hypot(frame.x - ghost.lastX, frame.z - ghost.lastZ);
+                            if (dist > 0.001) ghost.legPhase += dist * 4.5;
+                        }
+                        ghost.lastX = frame.x; ghost.lastZ = frame.z;
+
+                        const modelMatrix = getGhostModelMatrixForFrame(frame);
+                        modelMatrix[13] += levelTransitionY;
+                        gl.uniformMatrix4fv(uModelMatrix, false, modelMatrix);
+                        gl.drawElements(gl.TRIANGLES, ghostIndexCounts[type], gl.UNSIGNED_SHORT, 0);
+                    }
+                }
+                
+                // Ghost Legs
+                for (const ghost of ghostList) {
+                    if ((ghost.colorType || 0) !== type) continue;
+                    const frame = getGhostFrame(ghost);
+                    if (frame) {
+                        const opacity = getGhostOpacity(timestamp);
+                        renderLegs([frame.x, frame.y, frame.z], frame.yaw, ghost.legPhase, true, opacity, type);
+                    }
+                }
+                
+                // Ghost Tails
+                const tailPhase = timestamp * 0.008;
+                const tailWag = Math.sin(tailPhase) * 0.4;
+                const tailMatrix = new Float32Array(16);
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, ghostTailPosBufs[type]);
+                gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ARRAY_BUFFER, ghostTailNormBufs[type]);
+                gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ARRAY_BUFFER, ghostTailColBufs[type]);
+                gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ghostTailIdxBufs[type]);
+
+                for (const ghost of ghostList) {
+                    if ((ghost.colorType || 0) !== type) continue;
+                    const opacity = getGhostOpacity(timestamp);
+                    gl.uniform1f(u_globalAlpha, opacity);
+                    const frame = getGhostFrame(ghost);
+                    if (frame) {
+                        getGhostModelMatrix(tailMatrix, frame.x, frame.y, frame.z, frame.yaw);
+                        tailMatrix[13] += levelTransitionY;
+                        mat4Translate(tailMatrix, 0, TAIL_PIVOT_Y, TAIL_OFFSET_Z);
+                        mat4RotateY(tailMatrix, tailWag);
+                        gl.uniformMatrix4fv(uModelMatrix, false, tailMatrix);
+                        gl.drawElements(gl.TRIANGLES, ghostTailIndexCount, gl.UNSIGNED_SHORT, 0);
+                    }
                 }
             }
-            gl.uniform1i(uUseTexture, 0);
-            gl.disableVertexAttribArray(aTexCoord);
         }
         gl.disable(gl.BLEND);
         requestAnimationFrame(render);

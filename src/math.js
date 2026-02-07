@@ -31,6 +31,27 @@ export function mat4Identity(out) {
     out[12] = 0; out[13] = 0; out[14] = 0; out[15] = 1;
 }
 
+export function mat4Translate(out, x, y, z) {
+    out[12] += out[0] * x + out[4] * y + out[8] * z;
+    out[13] += out[1] * x + out[5] * y + out[9] * z;
+    out[14] += out[2] * x + out[6] * y + out[10] * z;
+    out[15] += out[3] * x + out[7] * y + out[11] * z;
+}
+
+export function mat4RotateY(out, rad) {
+    const s = Math.sin(rad), c = Math.cos(rad);
+    const a00 = out[0], a01 = out[1], a02 = out[2], a03 = out[3];
+    const a20 = out[8], a21 = out[9], a22 = out[10], a23 = out[11];
+    out[0] = a00 * c - a20 * s;
+    out[1] = a01 * c - a21 * s;
+    out[2] = a02 * c - a22 * s;
+    out[3] = a03 * c - a23 * s;
+    out[8] = a00 * s + a20 * c;
+    out[9] = a01 * s + a21 * c;
+    out[10] = a02 * s + a22 * c;
+    out[11] = a03 * s + a23 * c;
+}
+
 export function calculateIsometricFitBounds(roomSize, roomHeight, marginPercent = 0.15) {
     const halfSize = roomSize / 2;
     const corners = [
