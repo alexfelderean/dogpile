@@ -51,7 +51,10 @@ const fsSource = `
 // =============================================================================
 // GAME INITIALIZATION
 // =============================================================================
-function main() {
+async function main() {
+    // Load level first
+    await loadLevel('levels/level1.json');
+
     const canvas = document.getElementById('glCanvas');
 
     let lastWidth = 0;
@@ -95,21 +98,66 @@ function main() {
         return;
     }
 
-    // Create geometry
-    const room = createRoomGeometry();
+    // Create geometry (level must be loaded first)
+    let room = createRoomGeometry();
     const ghostGeom = createGhostGeometry();
     const playerGeom = createPlayerGeometry();
 
+    // Track room index count (can change per level)
+    let indexCount = room.indexCount;
+
     // Room buffers
     const posBuf = gl.createBuffer();
+    const colBuf = gl.createBuffer();
+    const idxBuf = gl.createBuffer();
+
+    // Level transition state
+    let levelTransitionY = -40; // Start below screen
+    let targetLevelTransitionY = 0;
+    let transitionCallback = null;
+    let transitionVelocity = 0;
+
+    // Function to trigger level exit animation
+    function transitionLevelOut(callback) {
+        targetLevelTransitionY = 40; // Animate up/out (must match render threshold)
+        transitionCallback = callback;
+        transitionVelocity = 0.2; // Start slow
+    }
+    window.transitionLevelOut = transitionLevelOut;
+
+    // Function to update room buffers (called when level changes)
+    function updateRoomBuffers() {
+        room = createRoomGeometry();
+        indexCount = room.indexCount;
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, room.positions, gl.STATIC_DRAW);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, colBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, room.colors, gl.STATIC_DRAW);
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, room.indices, gl.STATIC_DRAW);
+
+        // Reset transition to animate up from below
+        levelTransitionY = -40;
+        targetLevelTransitionY = 0;
+        transitionCallback = null;
+        transitionVelocity = 0;
+
+        console.log('Room buffers updated for new level');
+    }
+
+    // Make rebuildRoom available globally for level transitions
+    window.rebuildRoomGeometry = updateRoomBuffers;
+
+    // Initial buffer upload
     gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
     gl.bufferData(gl.ARRAY_BUFFER, room.positions, gl.STATIC_DRAW);
 
-    const colBuf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, colBuf);
     gl.bufferData(gl.ARRAY_BUFFER, room.colors, gl.STATIC_DRAW);
 
-    const idxBuf = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, room.indices, gl.STATIC_DRAW);
 
@@ -187,7 +235,7 @@ function main() {
     gl.uniform3f(uAmbientColor, 0.5, 0.5, 0.55);  // Brighter ambient
     gl.uniform3f(uLightColor, 0.6, 0.58, 0.5);   // Warm directional light
 
-    const indexCount = room.indexCount;
+    // indexCount is defined above and updated when level changes
     const ghostIndexCount = ghostGeom.indexCount;
     const playerIndexCount = playerGeom.indexCount;
 
@@ -204,9 +252,36 @@ function main() {
     const originalUpdatePlayer = updatePlayer;
 
     // =============================================================================
+    // Room model matrix (with transition)
+    const roomModelMatrix = new Float32Array(16);
+
+    // =============================================================================
     // RENDER LOOP
     // =============================================================================
     function render(timestamp) {
+        // Animate level transition
+        // Animate level transition
+        if (targetLevelTransitionY > 20) {
+            // Exit: Accelerate up
+            transitionVelocity *= 1.15;
+            levelTransitionY += transitionVelocity;
+
+            // Check if we passed the target
+            if (levelTransitionY >= targetLevelTransitionY) {
+                levelTransitionY = targetLevelTransitionY;
+                if (transitionCallback) {
+                    transitionCallback();
+                    transitionCallback = null;
+                }
+            }
+        } else {
+            // Entry: Ease out (decay)
+            levelTransitionY += (targetLevelTransitionY - levelTransitionY) * 0.1;
+
+            // Snap to zero
+            if (Math.abs(levelTransitionY) < 0.01) levelTransitionY = 0;
+        }
+
         // Update projection on resize
         if (canvas.width !== lastWidth || canvas.height !== lastHeight) {
             lastWidth = canvas.width;
@@ -272,8 +347,11 @@ function main() {
         mat4IsometricView(_viewMatrix);
         gl.uniformMatrix4fv(uViewMatrix, false, _viewMatrix);
 
-        // Draw room
-        gl.uniformMatrix4fv(uModelMatrix, false, identityMatrix);
+        // Draw room (moved by transition)
+        mat4Identity(roomModelMatrix);
+        roomModelMatrix[13] = levelTransitionY; // Apply Y translation
+        gl.uniformMatrix4fv(uModelMatrix, false, roomModelMatrix);
+
         gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
         gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ARRAY_BUFFER, normBuf);
@@ -297,6 +375,8 @@ function main() {
         gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerIdxBuf);
         getGhostModelMatrix(characterModelMatrix, playerPos[0], playerPos[1], playerPos[2], 0);
+        // Apply transition to player
+        characterModelMatrix[13] += levelTransitionY;
         gl.uniformMatrix4fv(uModelMatrix, false, characterModelMatrix);
         gl.drawElements(gl.TRIANGLES, playerIndexCount, gl.UNSIGNED_SHORT, 0);
 
@@ -315,6 +395,8 @@ function main() {
                 const frame = getGhostFrame(ghost);
                 if (frame) {
                     const modelMatrix = getGhostModelMatrixForFrame(frame);
+                    // Apply transition to ghost
+                    modelMatrix[13] += levelTransitionY;
                     gl.uniformMatrix4fv(uModelMatrix, false, modelMatrix);
                     gl.drawElements(gl.TRIANGLES, ghostIndexCount, gl.UNSIGNED_SHORT, 0);
                 }
