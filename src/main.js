@@ -1,6 +1,8 @@
 import { mat4Orthographic, mat4IsometricView, mat4Identity, mat4Translate, mat4RotateY, calculateIsometricFitBounds, _viewMatrix, _projMatrix, compileShader } from './math.js';
 import { player, setupPlayerInput, updatePlayer, getPlayerPosition, getPlayerYaw, hasPlayerInput, isPlayerActive, resetPlayer } from './player.js';
-import { startTimeLoop, isWaitingForInput, isTimeLoopRunning, setTimeLoopRunning, updateTimeLoop, recordFrame, handleGhostCollisions, getGhosts, getGhostFrame, getGhostModelMatrix, getGhostModelMatrixForFrame, getGhostOpacity, clearGhosts, getCurrentPlayerColor, createPlayerGeometry, createPlayerLegGeometry, createPlayerTailGeometry, createPlayerGeometryBlack, createPlayerGeometryWheaten, createPlayerGeometryBrindle, createPlayerLegGeometryBlack, createPlayerLegGeometryWheaten, createPlayerLegGeometryBrindle, createPlayerTailGeometryBlack, createPlayerTailGeometryWheaten, createPlayerTailGeometryBrindle, createShadowGeometry, createGhostGeometryBlack, createGhostGeometryWheaten, createGhostGeometryBrindle, createGhostLegGeometryBlack, createGhostLegGeometryWheaten, createGhostLegGeometryBrindle, createGhostTailGeometryBlack, createGhostTailGeometryWheaten, createGhostTailGeometryBrindle, LEG_POSITIONS, LEG_PIVOT_Y, TAIL_PIVOT_Y, TAIL_OFFSET_Z, DOG_VISUAL_SCALE } from './ghost.js';
+import { startTimeLoop, isWaitingForInput, isTimeLoopRunning, setTimeLoopRunning, updateTimeLoop, recordFrame, handleGhostCollisions, getGhosts, getGhostFrame, getGhostModelMatrix, getGhostModelMatrixForFrame, getGhostOpacity, getPlayerFadeOpacity, clearGhosts, getCurrentPlayerColor, createPlayerGeometry, createPlayerLegGeometry, createPlayerTailGeometry, createPlayerGeometryBlack, createPlayerGeometryWheaten, createPlayerGeometryBrindle, createPlayerLegGeometryBlack, createPlayerLegGeometryWheaten, createPlayerLegGeometryBrindle, createPlayerTailGeometryBlack, createPlayerTailGeometryWheaten, createPlayerTailGeometryBrindle, createShadowGeometry, createGhostGeometryBlack, createGhostGeometryWheaten, createGhostGeometryBrindle, createGhostLegGeometryBlack, createGhostLegGeometryWheaten, createGhostLegGeometryBrindle, createGhostTailGeometryBlack, createGhostTailGeometryWheaten, createGhostTailGeometryBrindle, LEG_POSITIONS, LEG_PIVOT_Y, TAIL_PIVOT_Y, TAIL_OFFSET_Z, DOG_VISUAL_SCALE } from './ghost.js';
+
+
 import { updatePressurePlates } from './pressureplate.js';
 import { updatePistons, handlePistonCollisions, isPistonAnimating } from './piston.js';
 import { loadLevel, createRoomGeometry, createArrowGeometry, createWallGeometry, handleLevelTileCollisions, updateDoorCollision, updateDoorLockState, GRID_SIZE, CELL_SIZE, ROOM_HEIGHT } from './room.js';
@@ -44,7 +46,7 @@ async function main() {
     function transitionLevelOut(callback) {
         targetLevelTransitionY = 40;
         transitionCallback = callback;
-        transitionVelocity = 0.2;
+        transitionVelocity = 0.1;
     }
     window.transitionLevelOut = transitionLevelOut;
     function updateRoomBuffers() {
@@ -76,6 +78,7 @@ async function main() {
         targetLevelTransitionY = 0;
         transitionCallback = null;
         transitionVelocity = 0;
+        document.getElementById('fo').style.opacity = 0;
     }
     function refreshRoomBuffers() {
         room = createRoomGeometry();
@@ -238,14 +241,18 @@ async function main() {
     const roomModelMatrix = new Float32Array(16);
     function render(timestamp) {
         if (targetLevelTransitionY > 20) {
-            transitionVelocity *= 1.15;
+            transitionVelocity *= 0.3;
             levelTransitionY += transitionVelocity;
             if (levelTransitionY >= targetLevelTransitionY) {
                 levelTransitionY = targetLevelTransitionY;
                 if (transitionCallback) { transitionCallback(); transitionCallback = null; }
             }
+            // Fade to white when camera starts moving down
+            if (levelTransitionY > 2.0) {
+                document.getElementById('fo').style.opacity = 1;
+            }
         } else {
-            levelTransitionY += (targetLevelTransitionY - levelTransitionY) * 0.1;
+            levelTransitionY += (targetLevelTransitionY - levelTransitionY) * 0.025;
             if (Math.abs(levelTransitionY) < 0.01) levelTransitionY = 0;
         }
         if (canvas.width !== lastWidth || canvas.height !== lastHeight) {
@@ -317,7 +324,11 @@ async function main() {
         }
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-        gl.uniform1f(u_globalAlpha, 1.0);
+
+        // Player Fade Logic
+        const playerOpacity = getPlayerFadeOpacity(timestamp);
+        gl.uniform1f(u_globalAlpha, playerOpacity);
+
         const playerPos = getPlayerPosition();
 
         // --- SHADOW PASS ---
@@ -330,6 +341,7 @@ async function main() {
         gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, shadowIdxBuf);
         // Player shadow
+        gl.uniform1f(u_globalAlpha, playerOpacity); // Fade shadow with player
         getGhostModelMatrix(characterModelMatrix, playerPos[0], 0, playerPos[2], getPlayerYaw());
         characterModelMatrix[13] += levelTransitionY;
         gl.uniformMatrix4fv(uModelMatrix, false, characterModelMatrix);
@@ -392,7 +404,7 @@ async function main() {
             gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, legBufs.idx);
 
-            if (isGhost) gl.uniform1f(u_globalAlpha, opacity);
+            gl.uniform1f(u_globalAlpha, opacity);
 
             for (const leg of LEG_POSITIONS) {
                 const legMatrix = new Float32Array(16);

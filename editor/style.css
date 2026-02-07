@@ -41,7 +41,8 @@ header p {
     gap: 20px;
 }
 
-.editor-panel, .info-panel {
+.editor-panel,
+.info-panel {
     background: white;
     border-radius: 10px;
     padding: 20px;
@@ -111,7 +112,8 @@ header p {
     width: 100%;
 }
 
-#heightInput, #channelInput {
+#heightInput,
+#channelInput {
     padding: 8px;
     border: 1px solid #ddd;
     border-radius: 5px;
@@ -138,13 +140,15 @@ header p {
     border-radius: 5px;
 }
 
-.info-section h3, .info-section h4 {
+.info-section h3,
+.info-section h4 {
     margin-bottom: 10px;
     color: #333;
     font-size: 16px;
 }
 
-#cellInfo p, #levelSummary p {
+#cellInfo p,
+#levelSummary p {
     margin: 5px 0;
     color: #555;
     font-size: 14px;
@@ -169,10 +173,25 @@ header p {
     border: 1px solid #333;
 }
 
-.legend-color.spawn { background: #4ade80; }
-.legend-color.plate { background: #fbbf24; }
-.legend-color.door { background: #f87171; }
-.legend-color.piston { background: #60a5fa; }
+.legend-color.arrow {
+    background: #e43b3b;
+}
+
+.legend-color.spawn {
+    background: #4ade80;
+}
+
+.legend-color.plate {
+    background: #fbbf24;
+}
+
+.legend-color.door {
+    background: #f87171;
+}
+
+.legend-color.piston {
+    background: #60a5fa;
+}
 
 .actions {
     display: flex;
