@@ -6,16 +6,19 @@ const vsSource = `
   attribute vec4 aPosition;
   attribute vec3 aNormal;
   attribute vec4 aColor;
+  attribute vec2 aTexCoord;
   uniform mat4 uModelMatrix;
   uniform mat4 uViewMatrix;
   uniform mat4 uProjectionMatrix;
   varying lowp vec4 vColor;
   varying highp vec3 vNormal;
   varying highp vec3 vWorldPos;
+  varying highp vec2 vTexCoord;
   void main() {
     vec4 worldPos = uModelMatrix * aPosition;
     gl_Position = uProjectionMatrix * uViewMatrix * worldPos;
     vColor = aColor;
+    vTexCoord = aTexCoord;
     // Transform normal to world space (for uniform scale, this works)
     vNormal = mat3(uModelMatrix) * aNormal;
     vWorldPos = worldPos.xyz;
@@ -27,9 +30,12 @@ const fsSource = `
   varying lowp vec4 vColor;
   varying highp vec3 vNormal;
   varying highp vec3 vWorldPos;
+  varying highp vec2 vTexCoord;
   uniform vec3 uLightDir;
   uniform vec3 uAmbientColor;
   uniform vec3 uLightColor;
+  uniform sampler2D uTexture;
+  uniform bool uUseTexture;
   
   void main() {
     // Normalize interpolated normal
@@ -38,15 +44,19 @@ const fsSource = `
     // Diffuse lighting
     float diff = max(dot(normal, uLightDir), 0.0);
     
+    // Get base color from texture or vertex color
+    vec4 baseColor = uUseTexture ? texture2D(uTexture, vTexCoord) : vColor;
+    
     // Combine ambient and diffuse
-    vec3 ambient = uAmbientColor * vColor.rgb;
-    vec3 diffuse = uLightColor * diff * vColor.rgb;
+    vec3 ambient = uAmbientColor * baseColor.rgb;
+    vec3 diffuse = uLightColor * diff * baseColor.rgb;
     
     vec3 finalColor = ambient + diffuse;
     
-    gl_FragColor = vec4(finalColor, vColor.a);
+    gl_FragColor = vec4(finalColor, baseColor.a);
   }
 `;
+
 
 // =============================================================================
 // GAME INITIALIZATION
@@ -256,16 +266,37 @@ async function main() {
     gl.bindBuffer(gl.ARRAY_BUFFER, playerNormBuf);
     gl.bufferData(gl.ARRAY_BUFFER, playerGeom.normals, gl.STATIC_DRAW);
 
+    const playerTexCoordBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, playerTexCoordBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, playerGeom.texCoords, gl.STATIC_DRAW);
+
+    // Load player texture
+    const playerTexture = gl.createTexture();
+    const playerTextureImg = new Image();
+    playerTextureImg.onload = function () {
+        gl.bindTexture(gl.TEXTURE_2D, playerTexture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, playerTextureImg);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        console.log('Player texture loaded');
+    };
+    playerTextureImg.src = 'textures/scott.jpg';
+
     // Attribute & uniform locations
     const aPosition = gl.getAttribLocation(program, 'aPosition');
     const aNormal = gl.getAttribLocation(program, 'aNormal');
     const aColor = gl.getAttribLocation(program, 'aColor');
+    const aTexCoord = gl.getAttribLocation(program, 'aTexCoord');
     const uModelMatrix = gl.getUniformLocation(program, 'uModelMatrix');
     const uViewMatrix = gl.getUniformLocation(program, 'uViewMatrix');
     const uProjection = gl.getUniformLocation(program, 'uProjectionMatrix');
     const uLightDir = gl.getUniformLocation(program, 'uLightDir');
     const uAmbientColor = gl.getUniformLocation(program, 'uAmbientColor');
     const uLightColor = gl.getUniformLocation(program, 'uLightColor');
+    const uTexture = gl.getUniformLocation(program, 'uTexture');
+    const uUseTexture = gl.getUniformLocation(program, 'uUseTexture');
 
     // Identity matrix for room
     const identityMatrix = new Float32Array(16);
@@ -447,7 +478,7 @@ async function main() {
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-        // Draw player (yellow/gold)
+        // Draw player (textured)
         const playerPos = getPlayerPosition();
         gl.bindBuffer(gl.ARRAY_BUFFER, playerPosBuf);
         gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
@@ -455,12 +486,24 @@ async function main() {
         gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ARRAY_BUFFER, playerColBuf);
         gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
+        // Bind texture coordinates
+        gl.enableVertexAttribArray(aTexCoord);
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerTexCoordBuf);
+        gl.vertexAttribPointer(aTexCoord, 2, gl.FLOAT, false, 0, 0);
+        // Enable texture
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, playerTexture);
+        gl.uniform1i(uTexture, 0);
+        gl.uniform1i(uUseTexture, 1);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerIdxBuf);
         getGhostModelMatrix(characterModelMatrix, playerPos[0], playerPos[1], playerPos[2], 0);
         // Apply transition to player
         characterModelMatrix[13] += levelTransitionY;
         gl.uniformMatrix4fv(uModelMatrix, false, characterModelMatrix);
         gl.drawElements(gl.TRIANGLES, playerIndexCount, gl.UNSIGNED_SHORT, 0);
+        // Disable texture for other objects
+        gl.uniform1i(uUseTexture, 0);
+        gl.disableVertexAttribArray(aTexCoord);
 
         // Draw ghosts (blue)
         const ghostList = getGhosts();
