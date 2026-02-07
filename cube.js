@@ -2,11 +2,11 @@
 const vsSource = `
   attribute vec4 aPosition;
   attribute vec4 aColor;
-  uniform mat4 uModelViewMatrix;
+  uniform mat4 uViewMatrix;
   uniform mat4 uProjectionMatrix;
   varying lowp vec4 vColor;
   void main() {
-    gl_Position = uProjectionMatrix * uModelViewMatrix * aPosition;
+    gl_Position = uProjectionMatrix * uViewMatrix * aPosition;
     vColor = aColor;
   }
 `;
@@ -19,24 +19,25 @@ const fsSource = `
 `;
 
 // --- Matrix Utilities ---
-function mat4Perspective(fov, aspect, near, far) {
+// Pre-allocated matrices to avoid per-frame allocations
+const _viewMatrix = new Float32Array(16);
+const _projMatrix = new Float32Array(16);
+const _tempVec3 = new Float32Array(3);
+
+function mat4Perspective(out, fov, aspect, near, far) {
     const f = 1.0 / Math.tan(fov / 2);
     const nf = 1 / (near - far);
-    return new Float32Array([
-        f / aspect, 0, 0, 0,
-        0, f, 0, 0,
-        0, 0, (far + near) * nf, -1,
-        0, 0, 2 * far * near * nf, 0,
-    ]);
+    out[0] = f / aspect; out[1] = 0; out[2] = 0; out[3] = 0;
+    out[4] = 0; out[5] = f; out[6] = 0; out[7] = 0;
+    out[8] = 0; out[9] = 0; out[10] = (far + near) * nf; out[11] = -1;
+    out[12] = 0; out[13] = 0; out[14] = 2 * far * near * nf; out[15] = 0;
 }
 
-function mat4Identity() {
-    return new Float32Array([
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1,
-    ]);
+function mat4Identity(out) {
+    out[0] = 1; out[1] = 0; out[2] = 0; out[3] = 0;
+    out[4] = 0; out[5] = 1; out[6] = 0; out[7] = 0;
+    out[8] = 0; out[9] = 0; out[10] = 1; out[11] = 0;
+    out[12] = 0; out[13] = 0; out[14] = 0; out[15] = 1;
 }
 
 function mat4Translate(out, v) {
@@ -66,10 +67,269 @@ function mat4RotateY(out, rad) {
     out[10] = a02 * s + a22 * c; out[11] = a03 * s + a23 * c;
 }
 
+// --- Camera ---
+const camera = {
+    position: [0, 1.6, 0],  // Eye height
+    yaw: 0,                  // Horizontal rotation (radians)
+    pitch: 0,                // Vertical rotation (radians)
+    speed: 0.08,
+    sensitivity: 0.002
+};
+
+// Build camera view matrix into pre-allocated array
+function getCameraViewMatrix(out) {
+    mat4Identity(out);
+
+    // First rotate, then translate (inverse of camera transform)
+    mat4RotateX(out, -camera.pitch);
+    mat4RotateY(out, -camera.yaw);
+
+    // Reuse temp vector for translation
+    _tempVec3[0] = -camera.position[0];
+    _tempVec3[1] = -camera.position[1];
+    _tempVec3[2] = -camera.position[2];
+    mat4Translate(out, _tempVec3);
+}
+
+// --- Input Handling ---
+const keys = {};
+let isPointerLocked = false;
+
+function setupInput(canvas) {
+    // Keyboard
+    document.addEventListener('keydown', (e) => {
+        keys[e.code] = true;
+        e.preventDefault();
+    });
+    document.addEventListener('keyup', (e) => {
+        keys[e.code] = false;
+    });
+
+    // Mouse movement
+    document.addEventListener('mousemove', (e) => {
+        if (!isPointerLocked) return;
+
+        camera.yaw -= e.movementX * camera.sensitivity;
+        camera.pitch -= e.movementY * camera.sensitivity;
+
+        // Clamp pitch to prevent flipping
+        if (camera.pitch > 1.57) camera.pitch = 1.57;
+        else if (camera.pitch < -1.57) camera.pitch = -1.57;
+    });
+
+    // Pointer lock
+    const overlay = document.getElementById('overlay');
+    const crosshair = document.getElementById('crosshair');
+
+    overlay.addEventListener('click', () => {
+        canvas.requestPointerLock();
+    });
+
+    document.addEventListener('pointerlockchange', () => {
+        isPointerLocked = document.pointerLockElement === canvas;
+        overlay.classList.toggle('hidden', isPointerLocked);
+        crosshair.classList.toggle('hidden', !isPointerLocked);
+    });
+}
+
+// Pre-calculated sin/cos for movement
+function updateCamera() {
+    if (!isPointerLocked) return;
+
+    const sinYaw = Math.sin(camera.yaw);
+    const cosYaw = Math.cos(camera.yaw);
+    const speed = camera.speed;
+
+    // WASD movement
+    if (keys['KeyW']) {
+        camera.position[0] -= sinYaw * speed;
+        camera.position[2] -= cosYaw * speed;
+    }
+    if (keys['KeyS']) {
+        camera.position[0] += sinYaw * speed;
+        camera.position[2] += cosYaw * speed;
+    }
+    if (keys['KeyA']) {
+        camera.position[0] -= cosYaw * speed;
+        camera.position[2] += sinYaw * speed;
+    }
+    if (keys['KeyD']) {
+        camera.position[0] += cosYaw * speed;
+        camera.position[2] -= sinYaw * speed;
+    }
+
+    // Clamp position to room bounds
+    const roomHalfSize = 4.5;
+    if (camera.position[0] > roomHalfSize) camera.position[0] = roomHalfSize;
+    else if (camera.position[0] < -roomHalfSize) camera.position[0] = -roomHalfSize;
+    if (camera.position[2] > roomHalfSize) camera.position[2] = roomHalfSize;
+    else if (camera.position[2] < -roomHalfSize) camera.position[2] = -roomHalfSize;
+}
+
+// --- Room Geometry ---
+function createRoomGeometry() {
+    const size = 5;      // Half-size of room
+    const height = 3;    // Room height
+
+    // Positions for each face (floor, ceiling, 4 walls)
+    const positions = [];
+    const colors = [];
+    const indices = [];
+    let vertexOffset = 0;
+
+    // Helper to add a quad
+    function addQuad(p1, p2, p3, p4, color) {
+        positions.push(...p1, ...p2, ...p3, ...p4);
+        for (let i = 0; i < 4; i++) {
+            colors.push(...color);
+        }
+        indices.push(
+            vertexOffset, vertexOffset + 1, vertexOffset + 2,
+            vertexOffset, vertexOffset + 2, vertexOffset + 3
+        );
+        vertexOffset += 4;
+    }
+
+    // Floor (dark gray)
+    addQuad(
+        [-size, 0, -size],
+        [size, 0, -size],
+        [size, 0, size],
+        [-size, 0, size],
+        [0.2, 0.2, 0.22, 1.0]
+    );
+
+    // Ceiling (dark blue-gray)
+    addQuad(
+        [-size, height, size],
+        [size, height, size],
+        [size, height, -size],
+        [-size, height, -size],
+        [0.15, 0.15, 0.2, 1.0]
+    );
+
+    // Back wall (blue-gray) - Z negative
+    addQuad(
+        [-size, 0, -size],
+        [-size, height, -size],
+        [size, height, -size],
+        [size, 0, -size],
+        [0.3, 0.35, 0.4, 1.0]
+    );
+
+    // Front wall (gray) - Z positive
+    addQuad(
+        [size, 0, size],
+        [size, height, size],
+        [-size, height, size],
+        [-size, 0, size],
+        [0.35, 0.35, 0.38, 1.0]
+    );
+
+    // Left wall (slate) - X negative
+    addQuad(
+        [-size, 0, size],
+        [-size, height, size],
+        [-size, height, -size],
+        [-size, 0, -size],
+        [0.28, 0.3, 0.35, 1.0]
+    );
+
+    // Right wall with door cutout (two parts)
+    // Right wall - top part above door
+    addQuad(
+        [size, 2.2, -1],
+        [size, height, -1],
+        [size, height, 1],
+        [size, 2.2, 1],
+        [0.32, 0.34, 0.38, 1.0]
+    );
+
+    // Right wall - left of door
+    addQuad(
+        [size, 0, size],
+        [size, height, size],
+        [size, height, 1],
+        [size, 0, 1],
+        [0.32, 0.34, 0.38, 1.0]
+    );
+
+    // Right wall - right of door
+    addQuad(
+        [size, 0, -1],
+        [size, height, -1],
+        [size, height, -size],
+        [size, 0, -size],
+        [0.32, 0.34, 0.38, 1.0]
+    );
+
+    // Exit door (vibrant green-cyan) - inset slightly
+    const doorInset = 0.02;
+    addQuad(
+        [size - doorInset, 0, -1],
+        [size - doorInset, 2.2, -1],
+        [size - doorInset, 2.2, 1],
+        [size - doorInset, 0, 1],
+        [0.2, 0.8, 0.6, 1.0]
+    );
+
+    // Door frame (darker)
+    const frameWidth = 0.08;
+    // Left frame
+    addQuad(
+        [size - doorInset + 0.01, 0, 1],
+        [size - doorInset + 0.01, 2.2, 1],
+        [size - doorInset + 0.01, 2.2, 1 + frameWidth],
+        [size - doorInset + 0.01, 0, 1 + frameWidth],
+        [0.1, 0.1, 0.12, 1.0]
+    );
+    // Right frame
+    addQuad(
+        [size - doorInset + 0.01, 0, -1 - frameWidth],
+        [size - doorInset + 0.01, 2.2, -1 - frameWidth],
+        [size - doorInset + 0.01, 2.2, -1],
+        [size - doorInset + 0.01, 0, -1],
+        [0.1, 0.1, 0.12, 1.0]
+    );
+    // Top frame
+    addQuad(
+        [size - doorInset + 0.01, 2.2, -1],
+        [size - doorInset + 0.01, 2.2 + frameWidth, -1],
+        [size - doorInset + 0.01, 2.2 + frameWidth, 1],
+        [size - doorInset + 0.01, 2.2, 1],
+        [0.1, 0.1, 0.12, 1.0]
+    );
+
+    return {
+        positions: new Float32Array(positions),
+        colors: new Float32Array(colors),
+        indices: new Uint16Array(indices),
+        indexCount: indices.length
+    };
+}
+
 // --- Main ---
 function main() {
     const canvas = document.getElementById('glCanvas');
-    const gl = canvas.getContext('webgl');
+
+    // Track if projection needs update
+    let projectionDirty = true;
+    let lastWidth = 0;
+    let lastHeight = 0;
+
+    // Set canvas to full window size
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        projectionDirty = true;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    const gl = canvas.getContext('webgl', {
+        antialias: false,  // Disable antialiasing for better performance
+        powerPreference: 'high-performance'
+    });
     if (!gl) { alert('WebGL not supported'); return; }
 
     // Compile shaders
@@ -97,104 +357,76 @@ function main() {
         return;
     }
 
-    // Cube vertex positions
-    const positions = new Float32Array([
-        // Front
-        -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1,
-        // Back
-        -1, -1, -1, -1, 1, -1, 1, 1, -1, 1, -1, -1,
-        // Top
-        -1, 1, -1, -1, 1, 1, 1, 1, 1, 1, 1, -1,
-        // Bottom
-        -1, -1, -1, 1, -1, -1, 1, -1, 1, -1, -1, 1,
-        // Right
-        1, -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1,
-        // Left
-        -1, -1, -1, -1, -1, 1, -1, 1, 1, -1, 1, -1,
-    ]);
-
-    // Face colors
-    const faceColors = [
-        [1.0, 0.3, 0.3, 1.0], // Front  - red
-        [0.3, 1.0, 0.3, 1.0], // Back   - green
-        [0.3, 0.3, 1.0, 1.0], // Top    - blue
-        [1.0, 1.0, 0.3, 1.0], // Bottom - yellow
-        [1.0, 0.3, 1.0, 1.0], // Right  - magenta
-        [0.3, 1.0, 1.0, 1.0], // Left   - cyan
-    ];
-
-    let colors = [];
-    for (const c of faceColors) {
-        colors = colors.concat(c, c, c, c); // 4 verts per face
-    }
-
-    // Element indices (two triangles per face)
-    const indices = new Uint16Array([
-        0, 1, 2, 0, 2, 3,   // front
-        4, 5, 6, 4, 6, 7,   // back
-        8, 9, 10, 8, 10, 11,   // top
-        12, 13, 14, 12, 14, 15,   // bottom
-        16, 17, 18, 16, 18, 19,   // right
-        20, 21, 22, 20, 22, 23,   // left
-    ]);
+    // Create room geometry
+    const room = createRoomGeometry();
 
     // Create buffers
     const posBuf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, room.positions, gl.STATIC_DRAW);
 
     const colBuf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, colBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, room.colors, gl.STATIC_DRAW);
 
     const idxBuf = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, room.indices, gl.STATIC_DRAW);
 
     // Attribute & uniform locations
     const aPosition = gl.getAttribLocation(program, 'aPosition');
     const aColor = gl.getAttribLocation(program, 'aColor');
-    const uModelView = gl.getUniformLocation(program, 'uModelViewMatrix');
+    const uViewMatrix = gl.getUniformLocation(program, 'uViewMatrix');
     const uProjection = gl.getUniformLocation(program, 'uProjectionMatrix');
 
-    // Projection matrix
-    const projMatrix = mat4Perspective(45 * Math.PI / 180, canvas.width / canvas.height, 0.1, 100.0);
-
+    // Enable depth testing
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
 
-    let rotation = 0;
+    // Set clear color once
+    gl.clearColor(0.05, 0.05, 0.08, 1.0);
+
+    // Use program once (we only have one)
+    gl.useProgram(program);
+
+    // Set up vertex attributes once (they don't change)
+    gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+    gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(aPosition);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, colBuf);
+    gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(aColor);
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+
+    // Setup input handling
+    setupInput(canvas);
+
+    // Cache index count
+    const indexCount = room.indexCount;
 
     function render() {
-        gl.clearColor(0.1, 0.1, 0.18, 1.0);
+        // Only update projection if canvas size changed
+        if (canvas.width !== lastWidth || canvas.height !== lastHeight) {
+            lastWidth = canvas.width;
+            lastHeight = canvas.height;
+            gl.viewport(0, 0, lastWidth, lastHeight);
+            mat4Perspective(_projMatrix, 70 * Math.PI / 180, lastWidth / lastHeight, 0.1, 100.0);
+            gl.uniformMatrix4fv(uProjection, false, _projMatrix);
+        }
+
+        // Update camera based on input
+        updateCamera();
+
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        // Model-view matrix
-        const mv = mat4Identity();
-        mat4Translate(mv, [0, 0, -6]);
-        mat4RotateX(mv, rotation * 0.7);
-        mat4RotateY(mv, rotation);
+        // View matrix from camera (writes to pre-allocated _viewMatrix)
+        getCameraViewMatrix(_viewMatrix);
+        gl.uniformMatrix4fv(uViewMatrix, false, _viewMatrix);
 
-        // Bind position buffer
-        gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
-        gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(aPosition);
+        gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, 0);
 
-        // Bind color buffer
-        gl.bindBuffer(gl.ARRAY_BUFFER, colBuf);
-        gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(aColor);
-
-        // Bind index buffer
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
-
-        gl.useProgram(program);
-        gl.uniformMatrix4fv(uProjection, false, projMatrix);
-        gl.uniformMatrix4fv(uModelView, false, mv);
-
-        gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
-
-        rotation += 0.01;
         requestAnimationFrame(render);
     }
 
