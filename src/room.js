@@ -258,16 +258,19 @@ export function createRoomGeometry() {
                 addBox(worldX - plateSize / 2, floorY + 0.01, worldZ - plateSize / 2, plateSize, 0.08, plateSize, color);
             } else if (objectType === 4) {
                 const piston = getPistonAt(row, col);
-                const isExtended = piston ? piston.isExtended : false;
+                const pistonHeight = piston ? piston.getHeight() : 0.5;
                 const baseColor = [0.6, 0.6, 0.7, 1.0];
-                const headColor = isExtended ? [0.7, 0.7, 0.8, 1.0] : baseColor;
-                if (isExtended) {
-                    addBox(worldX - cubeSize / 2, floorY, worldZ - cubeSize / 2, cubeSize, 0.5, cubeSize, baseColor);
+                const headColor = [0.7, 0.7, 0.8, 1.0];
+                // Always draw base
+                addBox(worldX - cubeSize / 2, floorY, worldZ - cubeSize / 2, cubeSize, 0.5, cubeSize, baseColor);
+                // Draw shaft and head if extending (height > 0.5)
+                if (pistonHeight > 0.5) {
                     const shaftSize = cubeSize * 0.6;
-                    addBox(worldX - shaftSize / 2, floorY + 0.5, worldZ - shaftSize / 2, shaftSize, 1.0, shaftSize, [0.4, 0.4, 0.5, 1.0]);
-                    addBox(worldX - cubeSize / 2, floorY + 1.5, worldZ - cubeSize / 2, cubeSize, 0.5, cubeSize, headColor);
-                } else {
-                    addBox(worldX - cubeSize / 2, floorY, worldZ - cubeSize / 2, cubeSize, 0.5, cubeSize, baseColor);
+                    const shaftHeight = pistonHeight - 1.0; // 0 at height 0.5, 1.0 at height 2
+                    if (shaftHeight > 0) {
+                        addBox(worldX - shaftSize / 2, floorY + 0.5, worldZ - shaftSize / 2, shaftSize, shaftHeight, shaftSize, [0.4, 0.4, 0.5, 1.0]);
+                    }
+                    addBox(worldX - cubeSize / 2, floorY + pistonHeight - 0.5, worldZ - cubeSize / 2, cubeSize, 0.5, cubeSize, headColor);
                 }
             } else if (objectType === 3) {
                 addBox(worldX - cubeSize / 2, floorY, worldZ - cubeSize / 2, cubeSize, cubeHeight, cubeSize, color);

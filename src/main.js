@@ -2,7 +2,7 @@ import { mat4Orthographic, mat4IsometricView, mat4Identity, calculateIsometricFi
 import { player, setupPlayerInput, updatePlayer, getPlayerPosition, getPlayerYaw, hasPlayerInput, isPlayerActive, resetPlayer } from './player.js';
 import { startTimeLoop, isWaitingForInput, isTimeLoopRunning, setTimeLoopRunning, updateTimeLoop, recordFrame, handleGhostCollisions, getGhosts, getGhostFrame, getGhostModelMatrix, getGhostModelMatrixForFrame, getGhostOpacity, clearGhosts, createGhostGeometry, createPlayerGeometry } from './ghost.js';
 import { updatePressurePlates } from './pressureplate.js';
-import { updatePistons, handlePistonCollisions } from './piston.js';
+import { updatePistons, handlePistonCollisions, isPistonAnimating } from './piston.js';
 import { loadLevel, createRoomGeometry, createArrowGeometry, createWallGeometry, handleLevelTileCollisions, updateDoorCollision, updateDoorLockState, GRID_SIZE, CELL_SIZE, ROOM_HEIGHT } from './room.js';
 import { initFloorShader, createFloorGeometry, updateFloorBuffers, renderFloor } from './floor.js';
 import { initWallShader, updateWallBuffers, renderWalls } from './wall.js';
@@ -221,6 +221,7 @@ async function main() {
             recordFrame(timestamp);
             updatePressurePlates();
             updatePistons();
+            if (isPistonAnimating()) refreshRoomBuffers();
             handlePistonCollisions();
             updateDoorLockState();
             updateDoorCollision();
