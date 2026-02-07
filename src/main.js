@@ -148,8 +148,28 @@ async function main() {
         console.log('Room buffers updated for new level');
     }
 
+    // Function to refresh room buffers without transition (for door color changes)
+    function refreshRoomBuffers() {
+        room = createRoomGeometry();
+        indexCount = room.indexCount;
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, room.positions, gl.STATIC_DRAW);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, colBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, room.colors, gl.STATIC_DRAW);
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, room.indices, gl.STATIC_DRAW);
+
+        // No transition reset - just update visuals
+    }
+
     // Make rebuildRoom available globally for level transitions
     window.rebuildRoomGeometry = updateRoomBuffers;
+
+    // Make refresh available for door state changes
+    window.refreshRoomBuffers = refreshRoomBuffers;
 
     // Initial buffer upload
     gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
@@ -336,6 +356,9 @@ async function main() {
 
             // Update pressure plates
             updatePressurePlates();
+
+            // Update door lock state based on pressure plates
+            updateDoorLockState();
 
             // Check door collision
             updateDoorCollision();

@@ -28,6 +28,13 @@ let ROOM_HEIGHT = 18;
 let levelGrid = [];
 let doorConfig = null;
 
+// Door lock state
+let doorLocked = true;
+
+// Door colors
+const DOOR_COLOR_LOCKED = [0.8, 0.2, 0.2, 1.0];   // Red when locked
+const DOOR_COLOR_UNLOCKED = [0.2, 0.8, 0.6, 1.0]; // Green when unlocked
+
 // Load a level from BINARY file
 async function loadLevel(levelPath) {
     try {
@@ -93,8 +100,11 @@ async function loadLevel(levelPath) {
             wall: doorWall,
             width: 2.5,
             height: 3.5,
-            color: [0.2, 0.8, 0.6, 1.0]
+            color: DOOR_COLOR_LOCKED  // Start locked (red)
         };
+
+        // Reset door lock state for new level
+        doorLocked = true;
 
         // Set player spawn (using global function from player.js)
         setPlayerSpawn(spawnX, 0, spawnZ);
@@ -147,6 +157,9 @@ function getLevelRoomHalf() {
 function checkDoorCollision(playerX, playerZ) {
 
     if (!doorConfig.wall) return false;
+
+    // Door won't open while locked
+    if (doorLocked) return false;
 
     const roomHalf = getLevelRoomHalf();
     const dw = doorConfig.width / 2;
@@ -217,6 +230,50 @@ function updateDoorCollision() {
     }
 
     return isColliding;
+}
+
+// =============================================================================
+// DOOR LOCK STATE
+// =============================================================================
+
+// Update door lock based on pressure plate state
+function updateDoorLockState() {
+    const flags = getLevelFlags();
+
+    // Unlock door when all pressure plates are pressed
+    if (flags.allPlatesPressed && doorLocked) {
+        doorLocked = false;
+        // Update door color to unlocked
+        if (doorConfig) {
+            doorConfig.color = DOOR_COLOR_UNLOCKED;
+        }
+        console.log('Door unlocked! All pressure plates activated.');
+        // Rebuild room to update door visuals
+        if (window.refreshRoomBuffers) {
+            window.refreshRoomBuffers();
+        }
+    } else if (!flags.allPlatesPressed && !doorLocked && flags.plateCount > 0) {
+        // Re-lock door if plates are released
+        doorLocked = true;
+        if (doorConfig) {
+            doorConfig.color = DOOR_COLOR_LOCKED;
+        }
+        console.log('Door locked! Pressure plates released.');
+        // Rebuild room to update door visuals
+        if (window.refreshRoomBuffers) {
+            window.refreshRoomBuffers();
+        }
+    }
+}
+
+// Check if door is currently locked
+function isDoorLocked() {
+    return doorLocked;
+}
+
+// Get current door color based on lock state
+function getCurrentDoorColor() {
+    return doorLocked ? DOOR_COLOR_LOCKED : DOOR_COLOR_UNLOCKED;
 }
 
 // =============================================================================
