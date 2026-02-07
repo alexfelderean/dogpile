@@ -13,7 +13,7 @@ const player = {
 
 // Room bounds for collision (9x9 grid * 2 cell size = 18 units wide, half = 9, with margin)
 const ROOM_HALF_SIZE = 8.7;
-const PLAYER_RADIUS = 0.3;
+const PLAYER_RADIUS = 0.7;
 
 // Input state
 const keys = {};
@@ -21,10 +21,10 @@ let gameActive = false;
 let isTouchMode = false;
 
 // Touch controls state
-const joystick = { 
-    id: null, 
-    active: false, 
-    vector: { x: 0, y: 0 }, 
+const joystick = {
+    id: null,
+    active: false,
+    vector: { x: 0, y: 0 },
     origin: { x: 0, y: 0 },
     current: { x: 0, y: 0 },
     radius: 50 // Max drag radius
@@ -114,18 +114,18 @@ function setupPlayerInput(canvas, onFirstInput) {
         let dy = joystick.current.y - joystick.origin.y;
         const dist = Math.hypot(dx, dy);
         const maxDist = joystick.radius;
-        
+
         // Clamp distance
         if (dist > maxDist) {
             const ratio = maxDist / dist;
             dx *= ratio;
             dy *= ratio;
         }
-        
+
         // Update normalized vector
         joystick.vector.x = dx / maxDist;
         joystick.vector.y = dy / maxDist;
-        
+
         // Move knob
         joystickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
     }
@@ -181,7 +181,7 @@ function setupPlayerInput(canvas, onFirstInput) {
 
         for (let i = 0; i < e.changedTouches.length; i++) {
             const t = e.changedTouches[i];
-            
+
             if (t.identifier === joystick.id) {
                 joystick.current.x = t.clientX;
                 joystick.current.y = t.clientY;
@@ -196,7 +196,7 @@ function setupPlayerInput(canvas, onFirstInput) {
 
         for (let i = 0; i < e.changedTouches.length; i++) {
             const t = e.changedTouches[i];
-            
+
             if (t.identifier === joystick.id) {
                 joystick.active = false;
                 joystick.id = null;
@@ -211,9 +211,9 @@ function setupPlayerInput(canvas, onFirstInput) {
 // Check if player has any movement input
 function hasPlayerInput() {
     return keys['KeyW'] || keys['KeyS'] || keys['KeyA'] || keys['KeyD'] ||
-           keys['ArrowUp'] || keys['ArrowDown'] || keys['ArrowLeft'] || keys['ArrowRight'] ||
-           keys['Space'] || jumpButton.pressed ||
-           Math.abs(joystick.vector.x) > 0.1 || Math.abs(joystick.vector.y) > 0.1;
+        keys['ArrowUp'] || keys['ArrowDown'] || keys['ArrowLeft'] || keys['ArrowRight'] ||
+        keys['Space'] || jumpButton.pressed ||
+        Math.abs(joystick.vector.x) > 0.1 || Math.abs(joystick.vector.y) > 0.1;
 }
 
 // Update player position based on input (isometric-aligned movement)
