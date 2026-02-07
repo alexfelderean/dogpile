@@ -233,6 +233,11 @@ export function createRoomGeometry() {
         }
     }
     const cubeSize = CELL_SIZE, cubeHeight = CELL_SIZE;
+    // Add downward-extending walls on front faces
+    const terrainColor = [0.55, 0.35, 0.2, 1.0];
+    const bottomY = -cubeSize * 10;
+    addQuad([-roomHalf, bottomY, roomHalf], [roomHalf, bottomY, roomHalf], [roomHalf, 0, roomHalf], [-roomHalf, 0, roomHalf], terrainColor);
+    addQuad([-roomHalf, 0, -roomHalf], [-roomHalf, bottomY, -roomHalf], [-roomHalf, bottomY, roomHalf], [-roomHalf, 0, roomHalf], terrainColor);
     clearPressurePlates();
     for (let row = 0; row < GRID_SIZE; row++) {
         for (let col = 0; col < GRID_SIZE; col++) {
