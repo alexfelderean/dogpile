@@ -3,23 +3,31 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
     <title>Dogpile</title>
     <style>
         * {
             margin: 0;
             padding: 0;
-            overflow: hidden
+            box-sizing: border-box;
         }
 
-        body {
-            background: #000
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            overscroll-behavior: none;
         }
 
         canvas {
             display: block;
-            width: 100vw;
-            height: 100vh
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
         }
 
         #t {
@@ -76,13 +84,14 @@
 
         #jz {
             position: fixed;
-            bottom: 40px;
-            left: 40px;
-            width: 120px;
-            height: 120px;
+            bottom: 20px;
+            left: 20px;
+            width: 110px;
+            height: 110px;
             z-index: 20;
             touch-action: none;
-            display: none
+            display: none;
+            overflow: visible
         }
 
         #jb {
@@ -90,16 +99,17 @@
             height: 100%;
             border-radius: 50%;
             background: rgba(255, 255, 255, .1);
-            border: 2px solid rgba(255, 255, 255, .3);
-            position: relative
+            border: 3px solid rgba(255, 255, 255, .4);
+            position: relative;
+            overflow: visible
         }
 
         #jk {
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 50px;
-            height: 50px;
+            width: 45px;
+            height: 45px;
             border-radius: 50%;
             background: rgba(255, 255, 255, .5);
             transform: translate(-50%, -50%);
@@ -120,10 +130,10 @@
 
         #jp {
             position: fixed;
-            bottom: 60px;
-            left: 200px;
-            width: 80px;
-            height: 80px;
+            bottom: 20px;
+            right: 20px;
+            width: 110px;
+            height: 110px;
             border-radius: 50%;
             background: rgba(255, 255, 255, .2);
             border: 3px solid rgba(255, 255, 255, .4);
@@ -132,9 +142,10 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font: bold 14px sans-serif;
+            font: bold 16px sans-serif;
             color: rgba(255, 255, 255, .8);
-            user-select: none
+            user-select: none;
+            overflow: visible
         }
 
         #jp.pr {

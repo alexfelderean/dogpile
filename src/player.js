@@ -92,7 +92,7 @@ export function setupPlayerInput(canvas, onFirstInput) {
             const rect = joystickZone.getBoundingClientRect();
             const centerX = rect.left + rect.width / 2;
             const centerY = rect.top + rect.height / 2;
-            if (Math.hypot(x - centerX, y - centerY) < 150 && !joystick.active) {
+            if (Math.hypot(x - centerX, y - centerY) < 100 && !joystick.active) {
                 joystick.id = t.identifier;
                 joystick.active = true;
                 joystick.origin.x = centerX;
