@@ -36,7 +36,7 @@ const jumpButton = {
 };
 
 // Spawn state
-let spawnPosition = [0, 0, 0];
+let spawnPosition = null;
 
 // Set player spawn position
 function setPlayerSpawn(x, y, z) {
