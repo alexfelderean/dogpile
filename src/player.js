@@ -237,25 +237,26 @@ function updatePlayer() {
     moveRight += joystick.vector.x;
     moveFwd -= joystick.vector.y; // Invert Y for natural control
 
-    if (moveFwd === 0 && moveRight === 0) return false;
+    // Apply horizontal movement only if there's input
+    if (moveFwd !== 0 || moveRight !== 0) {
+        // Convert isometric screen space to world space (45-degree rotation)
+        // W (forward) should go toward back corner, S (back) toward front corner
+        // D (right) should go toward right corner, A (left) toward left corner
+        const moveX = (moveRight + moveFwd) * 0.7071; // cos(45°) ≈ 0.7071
+        const moveZ = (moveRight - moveFwd) * 0.7071;
 
-    // Convert isometric screen space to world space (45-degree rotation)
-    // W (forward) should go toward back corner, S (back) toward front corner
-    // D (right) should go toward right corner, A (left) toward left corner
-    const moveX = (moveRight + moveFwd) * 0.7071; // cos(45°) ≈ 0.7071
-    const moveZ = (moveRight - moveFwd) * 0.7071;
+        // Apply movement
+        player.position[0] += moveX * speed;
+        player.position[2] += moveZ * speed;
+    }
 
-    // Apply movement
-    player.position[0] += moveX * speed;
-    player.position[2] += moveZ * speed;
-
-    // Handle jumping
+    // Handle jumping (always check, regardless of movement)
     if ((keys['Space'] || jumpButton.pressed) && !player.isJumping) {
         player.velocityY = player.jumpForce;
         player.isJumping = true;
     }
 
-    // Apply gravity and vertical movement
+    // Apply gravity and vertical movement (always runs)
     player.velocityY -= player.gravity;
     player.position[1] += player.velocityY;
 

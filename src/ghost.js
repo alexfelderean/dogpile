@@ -144,6 +144,8 @@ function handleGhostCollisions(timestamp) {
         return;
     }
 
+    let standingOnGhost = false;
+
     for (const ghost of ghosts) {
         const frame = getGhostFrame(ghost);
         if (!frame) continue;
@@ -161,13 +163,16 @@ function handleGhostCollisions(timestamp) {
 
         // If player is within horizontal bounds of the ghost
         if (horizontalDist < minHorizontalDist * 0.9) {
-            // Check if player is falling onto the ghost from above
-            if (playerBottomY >= ghostTopY - 0.3 && playerBottomY <= ghostTopY + 0.5 && player.velocityY <= 0) {
-                // Land on top of ghost
-                player.position[1] = ghostTopY;
-                player.velocityY = 0;
-                player.isJumping = false;
-                continue;  // Skip horizontal collision for this ghost
+            // Check if player is on top of or landing onto the ghost
+            if (playerBottomY >= ghostTopY - 0.3 && playerBottomY <= ghostTopY + 0.5) {
+                if (player.velocityY <= 0) {
+                    // Land on top of ghost
+                    player.position[1] = ghostTopY;
+                    player.velocityY = 0;
+                    player.isJumping = false;
+                    standingOnGhost = true;
+                    continue;  // Skip horizontal collision for this ghost
+                }
             }
         }
 
@@ -181,6 +186,11 @@ function handleGhostCollisions(timestamp) {
                 player.position[0] += minHorizontalDist;
             }
         }
+    }
+
+    // If player is in the air and not standing on any ghost, make sure they fall
+    if (!standingOnGhost && player.position[1] > 0 && !player.isJumping && player.velocityY === 0) {
+        player.isJumping = true;  // Re-enable gravity
     }
 
     clampPlayerToRoom();
@@ -334,6 +344,6 @@ function getGhosts() {
 }
 
 function getGhostModelMatrixForFrame(frame) {
-    getGhostModelMatrix(_ghostModelMatrix, frame.x, 0, frame.z, frame.yaw);
+    getGhostModelMatrix(_ghostModelMatrix, frame.x, frame.y, frame.z, frame.yaw);
     return _ghostModelMatrix;
 }
