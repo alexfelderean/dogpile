@@ -10,8 +10,8 @@
 // Add more object types as needed
 
 const GRID_SIZE = 9;
-const CELL_SIZE = 1;  // Each cell is 1x1 unit
-const ROOM_HEIGHT = GRID_SIZE;  // Room height matches grid size
+const CELL_SIZE = 2;  // Each cell is 1x1 unit
+const ROOM_HEIGHT = GRID_SIZE * CELL_SIZE;  // Room height matches room width/length
 
 // Initialize 9x9 grid with all zeros
 const levelGrid = [];
@@ -142,8 +142,9 @@ function createRoomGeometry() {
     );
 
     // --- GRID OBJECTS ---
-    const cubeSize = 0.8;
-    const cubeHeight = 0.8;
+    // Cubes fill the entire grid cell
+    const cubeSize = CELL_SIZE;
+    const cubeHeight = CELL_SIZE;
 
     for (let row = 0; row < GRID_SIZE; row++) {
         for (let col = 0; col < GRID_SIZE; col++) {
