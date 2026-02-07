@@ -91,22 +91,33 @@ export function compileShader(gl, type, source) {
 }
 
 // Shared AABB collision helper - returns push direction or null
-export function aabbCollision(px, py, pz, playerRadius, objX, objZ, objHalf, objHeight, player) {
+// objHeight is the height of the object, baseY is the world Y position of its base
+export function aabbCollision(px, py, pz, playerRadius, objX, objZ, objHalf, objHeight, player, baseY = 0) {
     const minX = objX - objHalf - playerRadius, maxX = objX + objHalf + playerRadius;
     const minZ = objZ - objHalf - playerRadius, maxZ = objZ + objHalf + playerRadius;
+    const topY = baseY + objHeight; // Absolute Y position of the object's top
     if (px > minX && px < maxX && pz > minZ && pz < maxZ) {
         // Standing on top check
-        if (py >= objHeight - 0.3 && py <= objHeight + 0.5 && player.velocityY <= 0) {
+        if (py >= topY - 0.3 && py <= topY + 0.5 && player.velocityY <= 0) {
             const strictMinX = objX - objHalf - playerRadius * 0.8;
             const strictMaxX = objX + objHalf + playerRadius * 0.8;
             const strictMinZ = objZ - objHalf - playerRadius * 0.8;
             const strictMaxZ = objZ + objHalf + playerRadius * 0.8;
             if (px > strictMinX && px < strictMaxX && pz > strictMinZ && pz < strictMaxZ) {
-                return { type: 'top', height: objHeight };
+                return { type: 'top', height: topY };
             }
         }
-        // Side collision
-        if (py < objHeight - 0.1) {
+        // Check if player is being pushed up from below (piston extending)
+        // If player is within the object's XZ bounds and below the top, push up
+        const strictMinX = objX - objHalf - playerRadius * 0.8;
+        const strictMaxX = objX + objHalf + playerRadius * 0.8;
+        const strictMinZ = objZ - objHalf - playerRadius * 0.8;
+        const strictMaxZ = objZ + objHalf + playerRadius * 0.8;
+        if (py < topY && py > baseY && px > strictMinX && px < strictMaxX && pz > strictMinZ && pz < strictMaxZ) {
+            return { type: 'top', height: topY };
+        }
+        // Side collision - only push sideways if player is clearly below AND outside the strict bounds
+        if (py < topY - 0.1 && py > baseY) {
             const overlapLeft = maxX - px, overlapRight = px - minX;
             const overlapBack = maxZ - pz, overlapFront = pz - minZ;
             const minOverlap = Math.min(overlapLeft, overlapRight, overlapBack, overlapFront);

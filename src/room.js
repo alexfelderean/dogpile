@@ -47,7 +47,8 @@ export async function loadLevel(levelPath) {
                 doorRow = row; doorCol = col; doorChannel = channel;
                 levelGrid[row][col] = 0;
             } else if (mechType === 1) {
-                createPiston(row, col, channel);
+                const height = levelHeight[row] ? levelHeight[row][col] : 0;
+                createPiston(row, col, channel, height);
                 levelGrid[row][col] = 4;
             }
         } else if (entityByte === 32) levelGrid[row][col] = 1;
@@ -243,7 +244,7 @@ export function createRoomGeometry() {
             const floorY = height * CELL_SIZE;
             const color = OBJECT_COLORS[objectType] || [0.5, 0.5, 0.5, 1.0];
             if (height > 0) {
-                const terrainColor = [0.45, 0.47, 0.52, 1.0];
+                const terrainColor = [0.55, 0.35, 0.2, 1.0];
                 const x = worldX - cubeSize / 2, z = worldZ - cubeSize / 2;
                 const w = cubeSize, d = cubeSize, h = floorY;
                 addQuad([x, 0, z + d], [x + w, 0, z + d], [x + w, h, z + d], [x, h, z + d], terrainColor);
@@ -253,21 +254,24 @@ export function createRoomGeometry() {
             }
             if (objectType === 2) {
                 const channel = entityByte & 0x0F;
-                createPressurePlate(row, col, channel);
+                createPressurePlate(row, col, channel, height);
                 const plateSize = CELL_SIZE * 0.7;
                 addBox(worldX - plateSize / 2, floorY + 0.01, worldZ - plateSize / 2, plateSize, 0.08, plateSize, color);
             } else if (objectType === 4) {
                 const piston = getPistonAt(row, col);
-                const isExtended = piston ? piston.isExtended : false;
+                const pistonHeight = piston ? piston.getHeight() : 0.5;
                 const baseColor = [0.6, 0.6, 0.7, 1.0];
-                const headColor = isExtended ? [0.7, 0.7, 0.8, 1.0] : baseColor;
-                if (isExtended) {
-                    addBox(worldX - cubeSize / 2, floorY, worldZ - cubeSize / 2, cubeSize, 0.5, cubeSize, baseColor);
+                const headColor = [0.7, 0.7, 0.8, 1.0];
+                // Always draw base
+                addBox(worldX - cubeSize / 2, floorY, worldZ - cubeSize / 2, cubeSize, 0.5, cubeSize, baseColor);
+                // Draw shaft and head if extending (height > 0.5)
+                if (pistonHeight > 0.5) {
                     const shaftSize = cubeSize * 0.6;
-                    addBox(worldX - shaftSize / 2, floorY + 0.5, worldZ - shaftSize / 2, shaftSize, 1.0, shaftSize, [0.4, 0.4, 0.5, 1.0]);
-                    addBox(worldX - cubeSize / 2, floorY + 1.5, worldZ - cubeSize / 2, cubeSize, 0.5, cubeSize, headColor);
-                } else {
-                    addBox(worldX - cubeSize / 2, floorY, worldZ - cubeSize / 2, cubeSize, 0.5, cubeSize, baseColor);
+                    const shaftHeight = pistonHeight - 1.0; // 0 at height 0.5, 1.0 at height 2
+                    if (shaftHeight > 0) {
+                        addBox(worldX - shaftSize / 2, floorY + 0.5, worldZ - shaftSize / 2, shaftSize, shaftHeight, shaftSize, [0.4, 0.4, 0.5, 1.0]);
+                    }
+                    addBox(worldX - cubeSize / 2, floorY + pistonHeight - 0.5, worldZ - cubeSize / 2, cubeSize, 0.5, cubeSize, headColor);
                 }
             } else if (objectType === 3) {
                 addBox(worldX - cubeSize / 2, floorY, worldZ - cubeSize / 2, cubeSize, cubeHeight, cubeSize, color);

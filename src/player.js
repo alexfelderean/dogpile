@@ -1,7 +1,8 @@
 import { isPlayerOnGhost } from './ghost.js';
+import { playBark } from './audio.js';
 
 export const player = {
-    position: [0, 0, 0], speed: 0.16, velocityY: 0, isJumping: false,
+    position: [0, 0, 0], speed: 0.12, velocityY: 0, isJumping: false,
     jumpForce: 0.25, gravity: 0.015, yaw: 0, targetYaw: 0
 };
 const DIR_POS_Z = 0, DIR_POS_X = -Math.PI / 2, DIR_NEG_Z = Math.PI, DIR_NEG_X = Math.PI / 2;
@@ -164,6 +165,7 @@ export function updatePlayer() {
     if ((keys['Space'] || jumpButton.pressed) && (!player.isJumping || isPlayerOnGhost())) {
         player.velocityY = player.jumpForce;
         player.isJumping = true;
+        playBark();
     }
     player.velocityY -= player.gravity;
     player.position[1] += player.velocityY;
