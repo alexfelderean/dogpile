@@ -96,15 +96,6 @@ function createRoomGeometry() {
         [0.2, 0.2, 0.22, 1.0]
     );
 
-    // --- CEILING ---
-    addQuad(
-        [-roomHalf, ROOM_HEIGHT, roomHalf],
-        [roomHalf, ROOM_HEIGHT, roomHalf],
-        [roomHalf, ROOM_HEIGHT, -roomHalf],
-        [-roomHalf, ROOM_HEIGHT, -roomHalf],
-        [0.15, 0.15, 0.2, 1.0]
-    );
-
     // --- WALLS ---
     const wallColor = [0.3, 0.32, 0.36, 1.0];
 
@@ -116,23 +107,6 @@ function createRoomGeometry() {
         [roomHalf, 0, -roomHalf],
         wallColor
     );
-    // Front wall (Z+)
-    addQuad(
-        [roomHalf, 0, roomHalf],
-        [roomHalf, ROOM_HEIGHT, roomHalf],
-        [-roomHalf, ROOM_HEIGHT, roomHalf],
-        [-roomHalf, 0, roomHalf],
-        wallColor
-    );
-    // Left wall (X-)
-    addQuad(
-        [-roomHalf, 0, roomHalf],
-        [-roomHalf, ROOM_HEIGHT, roomHalf],
-        [-roomHalf, ROOM_HEIGHT, -roomHalf],
-        [-roomHalf, 0, -roomHalf],
-        wallColor
-    );
-    // Right wall (X+)
     addQuad(
         [roomHalf, 0, -roomHalf],
         [roomHalf, ROOM_HEIGHT, -roomHalf],
