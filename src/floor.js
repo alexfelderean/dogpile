@@ -79,6 +79,10 @@ export function renderFloor(gl, modelMatrix, viewMatrix, projectionMatrix, time)
     gl.bindBuffer(gl.ARRAY_BUFFER, floorPositionBuffer);
     gl.enableVertexAttribArray(floorAPosition);
     gl.vertexAttribPointer(floorAPosition, 3, gl.FLOAT, false, 0, 0);
+    // Disable other attribs that may be globally enabled but unused by floor shader
+    gl.disableVertexAttribArray(1);
+    gl.disableVertexAttribArray(2);
+    gl.disableVertexAttribArray(3);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, floorIndexBuffer);
     gl.drawElements(gl.TRIANGLES, floorIndexCount, gl.UNSIGNED_SHORT, 0);
     gl.disableVertexAttribArray(floorAPosition);

@@ -33,6 +33,10 @@ export function renderSky(gl, time, width, height) {
     gl.bindBuffer(gl.ARRAY_BUFFER, skyPositionBuffer);
     gl.enableVertexAttribArray(skyAPosition);
     gl.vertexAttribPointer(skyAPosition, 2, gl.FLOAT, false, 0, 0);
+    // Disable other attribs that may be globally enabled but unused by sky shader
+    gl.disableVertexAttribArray(1);
+    gl.disableVertexAttribArray(2);
+    gl.disableVertexAttribArray(3);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.disableVertexAttribArray(skyAPosition);
     gl.enable(gl.DEPTH_TEST);

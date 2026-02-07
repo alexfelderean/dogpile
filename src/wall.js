@@ -53,6 +53,10 @@ export function renderWalls(gl, modelMatrix, viewMatrix, projectionMatrix) {
     gl.uniform1f(wallUBricksWidth, 18.0);
     gl.uniform3f(wallUBrickColor, 0.85, 0.8, 0.7);
     gl.uniform3f(wallUJointColor, 0.5, 0.48, 0.45);
+    // Disable attribs that may be globally enabled but unused by wall shader
+    // Wall uses aPosition (0) and aTexCoord (1), so disable 2 and 3
+    gl.disableVertexAttribArray(2);
+    gl.disableVertexAttribArray(3);
     gl.bindBuffer(gl.ARRAY_BUFFER, wallPositionBuffer);
     gl.enableVertexAttribArray(wallAPosition);
     gl.vertexAttribPointer(wallAPosition, 3, gl.FLOAT, false, 0, 0);
