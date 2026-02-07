@@ -117,8 +117,15 @@
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 0.6; }
-            50% { opacity: 1.0; }
+
+            0%,
+            100% {
+                opacity: 0.6;
+            }
+
+            50% {
+                opacity: 1.0;
+            }
         }
 
         #timer-fill.waiting {
@@ -158,7 +165,11 @@
     </div>
     <div id="ghost-count" class="hidden">Ghosts: 0/8</div>
     <canvas id="glCanvas"></canvas>
-    <script src="cube.js"></script>
+    <script src="src/math.js"></script>
+    <script src="src/player.js"></script>
+    <script src="src/ghost.js"></script>
+    <script src="src/room.js"></script>
+    <script src="src/main.js"></script>
 </body>
 
 </html>

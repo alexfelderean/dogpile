@@ -1,0 +1,50 @@
+// =============================================================================
+// MATH UTILITIES
+// =============================================================================
+// Pre-allocated matrices to avoid per-frame allocations
+const _viewMatrix = new Float32Array(16);
+const _projMatrix = new Float32Array(16);
+const _tempVec3 = new Float32Array(3);
+
+function mat4Perspective(out, fov, aspect, near, far) {
+    const f = 1.0 / Math.tan(fov / 2);
+    const nf = 1 / (near - far);
+    out[0] = f / aspect; out[1] = 0; out[2] = 0; out[3] = 0;
+    out[4] = 0; out[5] = f; out[6] = 0; out[7] = 0;
+    out[8] = 0; out[9] = 0; out[10] = (far + near) * nf; out[11] = -1;
+    out[12] = 0; out[13] = 0; out[14] = 2 * far * near * nf; out[15] = 0;
+}
+
+function mat4Identity(out) {
+    out[0] = 1; out[1] = 0; out[2] = 0; out[3] = 0;
+    out[4] = 0; out[5] = 1; out[6] = 0; out[7] = 0;
+    out[8] = 0; out[9] = 0; out[10] = 1; out[11] = 0;
+    out[12] = 0; out[13] = 0; out[14] = 0; out[15] = 1;
+}
+
+function mat4Translate(out, v) {
+    out[12] += out[0] * v[0] + out[4] * v[1] + out[8] * v[2];
+    out[13] += out[1] * v[0] + out[5] * v[1] + out[9] * v[2];
+    out[14] += out[2] * v[0] + out[6] * v[1] + out[10] * v[2];
+    out[15] += out[3] * v[0] + out[7] * v[1] + out[11] * v[2];
+}
+
+function mat4RotateX(out, rad) {
+    const s = Math.sin(rad), c = Math.cos(rad);
+    const a10 = out[4], a11 = out[5], a12 = out[6], a13 = out[7];
+    const a20 = out[8], a21 = out[9], a22 = out[10], a23 = out[11];
+    out[4] = a10 * c + a20 * s; out[5] = a11 * c + a21 * s;
+    out[6] = a12 * c + a22 * s; out[7] = a13 * c + a23 * s;
+    out[8] = a20 * c - a10 * s; out[9] = a21 * c - a11 * s;
+    out[10] = a22 * c - a12 * s; out[11] = a23 * c - a13 * s;
+}
+
+function mat4RotateY(out, rad) {
+    const s = Math.sin(rad), c = Math.cos(rad);
+    const a00 = out[0], a01 = out[1], a02 = out[2], a03 = out[3];
+    const a20 = out[8], a21 = out[9], a22 = out[10], a23 = out[11];
+    out[0] = a00 * c - a20 * s; out[1] = a01 * c - a21 * s;
+    out[2] = a02 * c - a22 * s; out[3] = a03 * c - a23 * s;
+    out[8] = a00 * s + a20 * c; out[9] = a01 * s + a21 * c;
+    out[10] = a02 * s + a22 * c; out[11] = a03 * s + a23 * c;
+}
