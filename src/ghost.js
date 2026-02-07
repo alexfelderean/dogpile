@@ -2,7 +2,7 @@ import { player, resetPlayer, getPlayerState, clampPlayerToRoom } from './player
 import { playBark } from './audio.js';
 import { resetPressurePlates } from './pressureplate.js';
 import { resetPistons } from './piston.js';
-import { resetDoorState } from './room.js';
+import { resetDoorState, getLevelGrid, getLevelGridSize, getLevelCellSize, getLevelRoomHalf } from './room.js';
 
 const MAX_GHOSTS = 4;
 const ghosts = [];
@@ -258,6 +258,43 @@ export function isPlayerOnGhost() {
     return false;
 }
 
+// Helper function to check if a position would collide with level geometry
+function wouldCollideWithLevel(x, z, playerRadius = 0.7) {
+    const levelGrid = getLevelGrid();
+    if (!levelGrid) return false;
+    
+    const GRID_SIZE = getLevelGridSize();
+    const CELL_SIZE = getLevelCellSize();
+    const roomHalf = getLevelRoomHalf();
+    
+    // Check room boundaries
+    const roomLimit = roomHalf - playerRadius;
+    if (Math.abs(x) > roomLimit || Math.abs(z) > roomLimit) return true;
+    
+    // Check level tiles
+    for (let row = 0; row < GRID_SIZE; row++) {
+        for (let col = 0; col < GRID_SIZE; col++) {
+            const objectType = levelGrid[row] ? levelGrid[row][col] : 0;
+            if (objectType === 0) continue;
+            if (objectType < 3) continue; // Skip non-solid objects
+            
+            const tileX = (col - GRID_SIZE / 2 + 0.5) * CELL_SIZE;
+            const tileZ = (row - GRID_SIZE / 2 + 0.5) * CELL_SIZE;
+            const tileHalf = CELL_SIZE / 2;
+            
+            const minX = tileX - tileHalf - playerRadius;
+            const maxX = tileX + tileHalf + playerRadius;
+            const minZ = tileZ - tileHalf - playerRadius;
+            const maxZ = tileZ + tileHalf + playerRadius;
+            
+            if (x > minX && x < maxX && z > minZ && z < maxZ) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 export function handleGhostCollisions(timestamp) {
     if (timestamp - timeLoop.collisionStartTime < timeLoop.collisionDelayTime * 1000) return;
     let standingOnGhost = false;
@@ -289,10 +326,24 @@ export function handleGhostCollisions(timestamp) {
                 const overlapBack = playerMaxZ - ghostMinZ;
                 const overlapFront = ghostMaxZ - playerMinZ;
                 const minOverlap = Math.min(overlapLeft, overlapRight, overlapBack, overlapFront);
-                if (minOverlap === overlapLeft) player.position[0] = ghostMinX - playerHalf;
-                else if (minOverlap === overlapRight) player.position[0] = ghostMaxX + playerHalf;
-                else if (minOverlap === overlapBack) player.position[2] = ghostMinZ - playerHalf;
-                else if (minOverlap === overlapFront) player.position[2] = ghostMaxZ + playerHalf;
+                
+                // Store original position
+                const oldX = player.position[0];
+                const oldZ = player.position[2];
+                let newX = oldX;
+                let newZ = oldZ;
+                
+                // Calculate new position based on minimum overlap
+                if (minOverlap === overlapLeft) newX = ghostMinX - playerHalf;
+                else if (minOverlap === overlapRight) newX = ghostMaxX + playerHalf;
+                else if (minOverlap === overlapBack) newZ = ghostMinZ - playerHalf;
+                else if (minOverlap === overlapFront) newZ = ghostMaxZ + playerHalf;
+                
+                // Only apply the push if it doesn't cause a wall collision
+                if (!wouldCollideWithLevel(newX, newZ, playerHalf)) {
+                    player.position[0] = newX;
+                    player.position[2] = newZ;
+                }
             }
         }
     }
