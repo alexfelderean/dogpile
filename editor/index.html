@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dogpile Level Editor</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -19,30 +21,31 @@
                 <div class="grid-container">
                     <canvas id="gridCanvas" width="540" height="540"></canvas>
                 </div>
-                
+
                 <div class="editor-controls">
                     <div class="mode-selector">
                         <label>Edit Mode:</label>
                         <button id="modeHeight" class="mode-btn active">Height</button>
                         <button id="modeEntity" class="mode-btn">Entity</button>
                     </div>
-                    
+
                     <div id="heightControls" class="control-section">
                         <label>Height Value (0-255):</label>
                         <input type="range" id="heightSlider" min="0" max="15" value="0">
                         <input type="number" id="heightInput" min="0" max="255" value="0">
                     </div>
-                    
+
                     <div id="entityControls" class="control-section" style="display: none;">
                         <label>Entity Type:</label>
                         <select id="entityType">
                             <option value="0">None (Clear)</option>
                             <option value="s">Spawn Point</option>
+                            <option value="a">Red Arrow</option>
                             <option value="p">Pressure Plate</option>
                             <option value="d">Door</option>
                             <option value="i">Piston</option>
                         </select>
-                        
+
                         <div id="channelControl" style="display: none;">
                             <label>Channel (0-15):</label>
                             <input type="number" id="channelInput" min="0" max="15" value="0">
@@ -71,6 +74,7 @@
                 <div class="info-section">
                     <h3>Entity Legend</h3>
                     <div class="legend">
+                        <div class="legend-item"><span class="legend-color arrow"></span> Red Arrow</div>
                         <div class="legend-item"><span class="legend-color spawn"></span> Spawn</div>
                         <div class="legend-item"><span class="legend-color plate"></span> Pressure Plate</div>
                         <div class="legend-item"><span class="legend-color door"></span> Door</div>
@@ -100,4 +104,5 @@
 
     <script src="editor.js"></script>
 </body>
+
 </html>
