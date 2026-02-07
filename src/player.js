@@ -96,8 +96,8 @@ export function setupPlayerInput(canvas, onFirstInput) {
             if (Math.hypot(x - centerX, y - centerY) < 100 && !joystick.active) {
                 joystick.id = t.identifier;
                 joystick.active = true;
-                joystick.origin.x = centerX;
-                joystick.origin.y = centerY;
+                joystick.origin.x = x;
+                joystick.origin.y = y;
                 joystick.current.x = x;
                 joystick.current.y = y;
                 updateJoystickVisual();
