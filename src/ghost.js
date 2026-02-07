@@ -316,13 +316,25 @@ function createGhostGeometry() {
     const positions = [];
     const colors = [];
     const normals = [];
+    const texCoords = [];
     const indices = [];
     let vertexOffset = 0;
 
-    function addQuad(p1, p2, p3, p4, color, normal) {
+    // UV regions matching player geometry (30x90 = 3 stacked 30x30 regions)
+    const uvTop = { v0: 0, v1: 1 / 3 };        // Cube top face
+    const uvFront = { v0: 1 / 3, v1: 2 / 3 };    // Front face (Z+)
+    const uvOther = { v0: 2 / 3, v1: 1 };      // All other faces
+
+    function addQuad(p1, p2, p3, p4, color, normal, uvRegion, flipV = false) {
         positions.push(...p1, ...p2, ...p3, ...p4);
         for (let i = 0; i < 4; i++) colors.push(...color);
         for (let i = 0; i < 4; i++) normals.push(...normal);
+        // UV coords for standard quad - flipV swaps v0/v1 to correct upside-down textures
+        if (flipV) {
+            texCoords.push(0, uvRegion.v1, 1, uvRegion.v1, 1, uvRegion.v0, 0, uvRegion.v0);
+        } else {
+            texCoords.push(0, uvRegion.v0, 1, uvRegion.v0, 1, uvRegion.v1, 0, uvRegion.v1);
+        }
         indices.push(
             vertexOffset, vertexOffset + 1, vertexOffset + 2,
             vertexOffset, vertexOffset + 2, vertexOffset + 3
@@ -333,25 +345,26 @@ function createGhostGeometry() {
     // Cube dimensions matching pressure plates (1.4x1.4x1.4)
     const size = 1.4;
     const half = size / 2;
-    const ghostColor = [0.4, 0.6, 0.9, 0.7];
+    const ghostColor = [0.4, 0.6, 0.9, 0.7]; // Fallback color (semi-transparent blue)
 
-    // Front (Z+)
-    addQuad([-half, 0, half], [half, 0, half], [half, size, half], [-half, size, half], ghostColor, [0, 0, 1]);
-    // Back (Z-)
-    addQuad([half, 0, -half], [-half, 0, -half], [-half, size, -half], [half, size, -half], ghostColor, [0, 0, -1]);
-    // Left (X-)
-    addQuad([-half, 0, -half], [-half, 0, half], [-half, size, half], [-half, size, -half], ghostColor, [-1, 0, 0]);
-    // Right (X+)
-    addQuad([half, 0, half], [half, 0, -half], [half, size, -half], [half, size, half], ghostColor, [1, 0, 0]);
-    // Top (Y+)
-    addQuad([-half, size, half], [half, size, half], [half, size, -half], [-half, size, -half], ghostColor, [0, 1, 0]);
-    // Bottom (Y-)
-    addQuad([-half, 0, -half], [half, 0, -half], [half, 0, half], [-half, 0, half], ghostColor, [0, -1, 0]);
+    // Front (Z+) - uses middle region (flipped to correct orientation)
+    addQuad([-half, 0, half], [half, 0, half], [half, size, half], [-half, size, half], ghostColor, [0, 0, 1], uvFront, true);
+    // Back (Z-) - uses bottom region
+    addQuad([half, 0, -half], [-half, 0, -half], [-half, size, -half], [half, size, -half], ghostColor, [0, 0, -1], uvOther);
+    // Left (X-) - uses bottom region
+    addQuad([-half, 0, -half], [-half, 0, half], [-half, size, half], [-half, size, -half], ghostColor, [-1, 0, 0], uvOther);
+    // Right (X+) - uses bottom region
+    addQuad([half, 0, half], [half, 0, -half], [half, size, -half], [half, size, half], ghostColor, [1, 0, 0], uvOther);
+    // Top (Y+) - uses top region (flipped to correct orientation)
+    addQuad([-half, size, half], [half, size, half], [half, size, -half], [-half, size, -half], ghostColor, [0, 1, 0], uvTop, true);
+    // Bottom (Y-) - uses bottom region
+    addQuad([-half, 0, -half], [half, 0, -half], [half, 0, half], [-half, 0, half], ghostColor, [0, -1, 0], uvOther);
 
     return {
         positions: new Float32Array(positions),
         colors: new Float32Array(colors),
         normals: new Float32Array(normals),
+        texCoords: new Float32Array(texCoords),
         indices: new Uint16Array(indices),
         indexCount: indices.length
     };

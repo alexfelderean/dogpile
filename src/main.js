@@ -83,6 +83,9 @@ async function main() {
     });
     if (!gl) { alert('WebGL not supported'); return; }
 
+    // Initialize sky shader
+    initSkyShader(gl);
+
     // Compile shaders
     function compileShader(type, source) {
         const shader = gl.createShader(type);
@@ -248,6 +251,10 @@ async function main() {
     const ghostNormBuf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, ghostNormBuf);
     gl.bufferData(gl.ARRAY_BUFFER, ghostGeom.normals, gl.STATIC_DRAW);
+
+    const ghostTexCoordBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, ghostTexCoordBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, ghostGeom.texCoords, gl.STATIC_DRAW);
 
     // Player buffers
     const playerPosBuf = gl.createBuffer();
@@ -439,6 +446,17 @@ async function main() {
         // Clear and render
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+        // Render sky background first
+        renderSky(gl, timestamp, canvas.width, canvas.height);
+
+        // Switch back to main shader program
+        gl.useProgram(program);
+
+        // Re-enable vertex attributes for main scene
+        gl.enableVertexAttribArray(aPosition);
+        gl.enableVertexAttribArray(aNormal);
+        gl.enableVertexAttribArray(aColor);
+
         // Isometric view matrix (fixed camera angle)
         mat4IsometricView(_viewMatrix);
         gl.uniformMatrix4fv(uViewMatrix, false, _viewMatrix);
@@ -514,6 +532,15 @@ async function main() {
             gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
             gl.bindBuffer(gl.ARRAY_BUFFER, ghostColBuf);
             gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
+            // Bind texture coordinates for ghosts
+            gl.enableVertexAttribArray(aTexCoord);
+            gl.bindBuffer(gl.ARRAY_BUFFER, ghostTexCoordBuf);
+            gl.vertexAttribPointer(aTexCoord, 2, gl.FLOAT, false, 0, 0);
+            // Enable texture (same as player)
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, playerTexture);
+            gl.uniform1i(uTexture, 0);
+            gl.uniform1i(uUseTexture, 1);
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ghostIdxBuf);
 
             for (const ghost of ghostList) {
@@ -526,6 +553,9 @@ async function main() {
                     gl.drawElements(gl.TRIANGLES, ghostIndexCount, gl.UNSIGNED_SHORT, 0);
                 }
             }
+            // Disable texture after ghost rendering
+            gl.uniform1i(uUseTexture, 0);
+            gl.disableVertexAttribArray(aTexCoord);
         }
 
         gl.disable(gl.BLEND);
