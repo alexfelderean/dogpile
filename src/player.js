@@ -1,3 +1,5 @@
+import { isPlayerOnGhost } from './ghost.js';
+
 export const player = {
     position: [0, 0, 0], speed: 0.16, velocityY: 0, isJumping: false,
     jumpForce: 0.25, gravity: 0.015, yaw: 0, targetYaw: 0
@@ -159,7 +161,7 @@ export function updatePlayer() {
         else if (absMoveZ > absMoveX) player.targetYaw = moveZ > 0 ? DIR_POS_Z : DIR_NEG_Z;
     }
     player.yaw = lerpAngle(player.yaw, player.targetYaw, ROTATION_LERP_SPEED);
-    if ((keys['Space'] || jumpButton.pressed) && !player.isJumping) {
+    if ((keys['Space'] || jumpButton.pressed) && (!player.isJumping || isPlayerOnGhost())) {
         player.velocityY = player.jumpForce;
         player.isJumping = true;
     }

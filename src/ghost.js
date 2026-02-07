@@ -4,7 +4,7 @@ const MAX_GHOSTS = 8;
 const ghosts = [];
 let currentRecording = [];
 const timeLoop = {
-    duration: 3, startTime: 0, isRunning: false, waitingForInput: false,
+    duration: 10, startTime: 0, isRunning: false, waitingForInput: false,
     recordInterval: 1000 / 60, lastRecordTime: 0, collisionDelayTime: 1.0, collisionStartTime: 0
 };
 const _ghostModelMatrix = new Float32Array(16);
@@ -82,6 +82,28 @@ export function getGhostFrame(ghost) {
 
 const GHOST_SIZE = 1.4;
 const PLAYER_SIZE = 1.4;
+
+export function isPlayerOnGhost() {
+    const ghostHalf = GHOST_SIZE / 2;
+    const playerHalf = PLAYER_SIZE / 2;
+    for (const ghost of ghosts) {
+        const frame = getGhostFrame(ghost);
+        if (!frame) continue;
+        const px = player.position[0], py = player.position[1], pz = player.position[2];
+        const gx = frame.x, gy = frame.y, gz = frame.z;
+        const playerMinX = px - playerHalf, playerMaxX = px + playerHalf;
+        const playerMinZ = pz - playerHalf, playerMaxZ = pz + playerHalf;
+        const ghostMinX = gx - ghostHalf, ghostMaxX = gx + ghostHalf;
+        const ghostMinZ = gz - ghostHalf, ghostMaxZ = gz + ghostHalf;
+        const ghostTopY = gy + GHOST_SIZE;
+        const overlapX = playerMaxX > ghostMinX && playerMinX < ghostMaxX;
+        const overlapZ = playerMaxZ > ghostMinZ && playerMinZ < ghostMaxZ;
+        if (overlapX && overlapZ && py >= ghostTopY - 0.3 && py <= ghostTopY + 0.5) {
+            return true;
+        }
+    }
+    return false;
+}
 
 export function handleGhostCollisions(timestamp) {
     if (timestamp - timeLoop.collisionStartTime < timeLoop.collisionDelayTime * 1000) return;
