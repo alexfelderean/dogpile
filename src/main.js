@@ -186,6 +186,12 @@ function main() {
             updatePlayer();
             handleGhostCollisions(timestamp);
             recordFrame(timestamp);
+
+            // Update pressure plates
+            updatePressurePlates();
+
+            // Check door collision
+            updateDoorCollision();
         }
 
         // Clear and render
