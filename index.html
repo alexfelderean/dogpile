@@ -116,6 +116,15 @@
             background: linear-gradient(90deg, #f39c12, #e74c3c);
         }
 
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1.0; }
+        }
+
+        #timer-fill.waiting {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
         #ghost-count {
             position: fixed;
             top: 35px;

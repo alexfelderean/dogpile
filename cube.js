@@ -82,8 +82,11 @@ const timeLoop = {
     duration: 3,            // Loop duration in seconds
     startTime: 0,
     isRunning: false,
+    waitingForInput: false,  // Waiting for first input to start
     recordInterval: 1000 / 60, // ~60Hz recording
-    lastRecordTime: 0
+    lastRecordTime: 0,
+    collisionDelayTime: 1.0, // Delay before collisions are active (seconds)
+    collisionStartTime: 0
 };
 
 // --- Ghost System ---
@@ -120,8 +123,16 @@ function resetLoop() {
         ghost.currentFrame = 0;
     }
     
-    // Restart timer
-    timeLoop.startTime = performance.now();
+    // Wait for input before starting next run
+    timeLoop.waitingForInput = true;
+    timeLoop.startTime = 0;
+    timeLoop.lastRecordTime = 0;
+}
+
+function startLoop(timestamp) {
+    timeLoop.waitingForInput = false;
+    timeLoop.startTime = timestamp;
+    timeLoop.collisionStartTime = timestamp;
     timeLoop.lastRecordTime = 0;
 }
 
@@ -153,7 +164,12 @@ function updateGhosts() {
 const GHOST_RADIUS = 0.35;  // Collision radius for ghosts
 const PLAYER_RADIUS = 0.3; // Collision radius for player
 
-function handleGhostCollisions() {
+function handleGhostCollisions(timestamp) {
+    // Don't collide during the delay period
+    if (timestamp - timeLoop.collisionStartTime < timeLoop.collisionDelayTime * 1000) {
+        return;
+    }
+    
     for (const ghost of ghosts) {
         if (ghost.currentFrame > 0 && ghost.currentFrame <= ghost.frames.length) {
             const frame = ghost.frames[ghost.currentFrame - 1];
@@ -190,6 +206,16 @@ function handleGhostCollisions() {
 
 function updateTimerUI(elapsed) {
     const timerFill = document.getElementById('timer-fill');
+    
+    if (timeLoop.waitingForInput) {
+        // Show full bar with pulsing opacity when waiting for input
+        timerFill.style.width = '100%';
+        timerFill.classList.remove('warning');
+        timerFill.classList.add('waiting');
+        return;
+    }
+    
+    timerFill.classList.remove('waiting');
     const remaining = Math.max(0, 1 - elapsed / timeLoop.duration);
     timerFill.style.width = (remaining * 100) + '%';
     
@@ -238,6 +264,11 @@ function setupInput(canvas) {
     // Mouse movement
     document.addEventListener('mousemove', (e) => {
         if (!isPointerLocked) return;
+        
+        // Start the loop on first mouse movement
+        if (timeLoop.waitingForInput) {
+            startLoop(performance.now());
+        }
 
         camera.yaw -= e.movementX * camera.sensitivity;
         camera.pitch -= e.movementY * camera.sensitivity;
@@ -268,18 +299,28 @@ function setupInput(canvas) {
         // Start/stop the time loop
         if (isPointerLocked) {
             timeLoop.isRunning = true;
-            timeLoop.startTime = performance.now();
-            timeLoop.lastRecordTime = 0;
+            timeLoop.waitingForInput = true; // Wait for first input
             updateGhostCountUI();
         } else {
             timeLoop.isRunning = false;
+            timeLoop.waitingForInput = false;
         }
     });
 }
 
 // Pre-calculated sin/cos for movement
-function updateCamera() {
+function updateCamera(timestamp) {
     if (!isPointerLocked) return;
+    
+    // Start the loop on first input
+    if (timeLoop.waitingForInput) {
+        const hasInput = keys['KeyW'] || keys['KeyS'] || keys['KeyA'] || keys['KeyD'];
+        if (hasInput) {
+            startLoop(timestamp);
+        } else {
+            return; // Don't move until loop starts
+        }
+    }
 
     const sinYaw = Math.sin(camera.yaw);
     const cosYaw = Math.cos(camera.yaw);
@@ -612,28 +653,32 @@ function main() {
 
         // Time loop logic
         if (timeLoop.isRunning) {
-            const elapsed = (timestamp - timeLoop.startTime) / 1000;
-            updateTimerUI(elapsed);
-            
-            // Update ghost playback
-            updateGhosts();
-            
-            // Check for loop reset
-            if (elapsed >= timeLoop.duration) {
-                resetLoop();
+            if (timeLoop.waitingForInput) {
+                updateTimerUI(0); // Show full bar while waiting
+            } else {
+                const elapsed = (timestamp - timeLoop.startTime) / 1000;
+                updateTimerUI(elapsed);
+                
+                // Update ghost playback
+                updateGhosts();
+                
+                // Check for loop reset
+                if (elapsed >= timeLoop.duration) {
+                    resetLoop();
+                }
             }
         }
 
         // Update camera based on input
-        updateCamera();
+        updateCamera(timestamp);
         
         // Handle ghost collisions (ghosts push player)
-        if (timeLoop.isRunning) {
-            handleGhostCollisions();
+        if (timeLoop.isRunning && !timeLoop.waitingForInput) {
+            handleGhostCollisions(timestamp);
         }
         
         // Record current frame (after collision resolution)
-        if (timeLoop.isRunning) {
+        if (timeLoop.isRunning && !timeLoop.waitingForInput) {
             recordFrame(timestamp);
         }
 
