@@ -40,6 +40,9 @@ def parse_entity(entity_str):
     elif etype == 'i':
         # Piston mechanism: 128 + (type 1 << 4) + channel = 144 + channel
         return 144 + channel
+    elif etype == 'a':
+        # Arrow: value 32
+        return 32
     else:
         sys.stderr.write(f"Unknown entity type: {etype}\n")
         return 0
