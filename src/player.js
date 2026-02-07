@@ -4,7 +4,7 @@
 // Camera/player state
 const player = {
     position: [0, 0, 0],  // Ground level
-    speed: 0.08,
+    speed: 0.16,
     velocityY: 0,
     isJumping: false,
     jumpForce: 0.25,
