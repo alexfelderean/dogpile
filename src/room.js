@@ -198,6 +198,107 @@ function updateDoorCollision() {
 }
 
 // =============================================================================
+// LEVEL TILE COLLISION
+// =============================================================================
+// Convert grid position to world position (for collision)
+function gridToWorldCollision(row, col) {
+    return [
+        (col - GRID_SIZE / 2 + 0.5) * CELL_SIZE,
+        (row - GRID_SIZE / 2 + 0.5) * CELL_SIZE
+    ];
+}
+
+// Handle player collision with level tiles (cubes)
+function handleLevelTileCollisions() {
+    if (!levelLoaded || !levelGrid) return;
+
+    const cubeSize = CELL_SIZE;  // 2 units
+    const cubeHeight = CELL_SIZE;  // 2 units
+    const playerRadius = 0.7;  // Match player size
+
+    let standingOnTile = false;
+
+    for (let row = 0; row < GRID_SIZE; row++) {
+        for (let col = 0; col < GRID_SIZE; col++) {
+            const objectType = levelGrid[row] ? levelGrid[row][col] : 0;
+            // Only collide with cube tiles (type 3 and above, not empty/arrow/pressure plate)
+            if (objectType < 3) continue;
+
+            const [tileX, tileZ] = gridToWorldCollision(row, col);
+            const tileHalf = cubeSize / 2;
+
+            // Check if player is within the tile's horizontal bounds
+            const playerX = player.position[0];
+            const playerZ = player.position[2];
+            const playerY = player.position[1];
+
+            // AABB collision check (axis-aligned bounding box)
+            const minX = tileX - tileHalf - playerRadius;
+            const maxX = tileX + tileHalf + playerRadius;
+            const minZ = tileZ - tileHalf - playerRadius;
+            const maxZ = tileZ + tileHalf + playerRadius;
+
+            // Check if player is within horizontal bounds of tile
+            const inHorizontalBounds = playerX > minX && playerX < maxX &&
+                playerZ > minZ && playerZ < maxZ;
+
+            if (inHorizontalBounds) {
+                // Check for landing on top
+                if (playerY >= cubeHeight - 0.3 && playerY <= cubeHeight + 0.5 && player.velocityY <= 0) {
+                    // More strict check for being above the tile
+                    const strictMinX = tileX - tileHalf - playerRadius * 0.8;
+                    const strictMaxX = tileX + tileHalf + playerRadius * 0.8;
+                    const strictMinZ = tileZ - tileHalf - playerRadius * 0.8;
+                    const strictMaxZ = tileZ + tileHalf + playerRadius * 0.8;
+
+                    if (playerX > strictMinX && playerX < strictMaxX &&
+                        playerZ > strictMinZ && playerZ < strictMaxZ) {
+                        // Land on top of tile
+                        player.position[1] = cubeHeight;
+                        player.velocityY = 0;
+                        player.isJumping = false;
+                        standingOnTile = true;
+                        continue;
+                    }
+                }
+
+                // Horizontal collision (only if player is below the top of the tile)
+                if (playerY < cubeHeight - 0.1) {
+                    // Find the closest edge and push player out
+                    const overlapLeft = maxX - playerX;
+                    const overlapRight = playerX - minX;
+                    const overlapBack = maxZ - playerZ;
+                    const overlapFront = playerZ - minZ;
+
+                    const minOverlap = Math.min(overlapLeft, overlapRight, overlapBack, overlapFront);
+
+                    if (minOverlap === overlapLeft) {
+                        player.position[0] = maxX;
+                    } else if (minOverlap === overlapRight) {
+                        player.position[0] = minX;
+                    } else if (minOverlap === overlapBack) {
+                        player.position[2] = maxZ;
+                    } else if (minOverlap === overlapFront) {
+                        player.position[2] = minZ;
+                    }
+                }
+            }
+        }
+    }
+
+    // If player was standing on a tile and now isn't, enable falling
+    if (!standingOnTile && player.position[1] > 0 && player.position[1] <= cubeHeight + 0.1 &&
+        !player.isJumping && player.velocityY === 0) {
+        // Check if we're at cube height (not ground level)
+        if (player.position[1] > 0.1) {
+            player.isJumping = true;  // Re-enable gravity
+        }
+    }
+
+    return standingOnTile;
+}
+
+// =============================================================================
 // GEOMETRY CREATION
 // =============================================================================
 function createRoomGeometry() {

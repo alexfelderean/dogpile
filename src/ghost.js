@@ -137,50 +137,86 @@ function getGhostFrame(ghost) {
 }
 
 // --- Ghost Collisions ---
-const GHOST_HEIGHT = 1.4;  // Height of ghost cube
+const GHOST_SIZE = 1.4;   // Size of ghost cube
+const PLAYER_SIZE = 1.4;  // Size of player cube
 
 function handleGhostCollisions(timestamp) {
     if (timestamp - timeLoop.collisionStartTime < timeLoop.collisionDelayTime * 1000) {
         return;
     }
 
+    let standingOnGhost = false;
+    const ghostHalf = GHOST_SIZE / 2;
+    const playerHalf = PLAYER_SIZE / 2;
+
     for (const ghost of ghosts) {
         const frame = getGhostFrame(ghost);
         if (!frame) continue;
 
-        const dx = player.position[0] - frame.x;
-        const dy = player.position[1] - frame.y;  // Vertical difference
-        const dz = player.position[2] - frame.z;
-        const horizontalDist = Math.sqrt(dx * dx + dz * dz);
+        // Player position
+        const px = player.position[0];
+        const py = player.position[1];
+        const pz = player.position[2];
 
-        const minHorizontalDist = GHOST_RADIUS + GHOST_PLAYER_RADIUS;
+        // Ghost position
+        const gx = frame.x;
+        const gy = frame.y;
+        const gz = frame.z;
 
-        // Check if player is above the ghost (landing on top)
-        const ghostTopY = frame.y + GHOST_HEIGHT;
-        const playerBottomY = player.position[1];
+        // AABB collision bounds
+        const playerMinX = px - playerHalf;
+        const playerMaxX = px + playerHalf;
+        const playerMinZ = pz - playerHalf;
+        const playerMaxZ = pz + playerHalf;
 
-        // If player is within horizontal bounds of the ghost
-        if (horizontalDist < minHorizontalDist * 0.9) {
-            // Check if player is falling onto the ghost from above
-            if (playerBottomY >= ghostTopY - 0.3 && playerBottomY <= ghostTopY + 0.5 && player.velocityY <= 0) {
+        const ghostMinX = gx - ghostHalf;
+        const ghostMaxX = gx + ghostHalf;
+        const ghostMinZ = gz - ghostHalf;
+        const ghostMaxZ = gz + ghostHalf;
+        const ghostTopY = gy + GHOST_SIZE;
+
+        // Check horizontal overlap
+        const overlapX = playerMaxX > ghostMinX && playerMinX < ghostMaxX;
+        const overlapZ = playerMaxZ > ghostMinZ && playerMinZ < ghostMaxZ;
+
+        if (overlapX && overlapZ) {
+            // Check for landing on top
+            if (py >= ghostTopY - 0.3 && py <= ghostTopY + 0.5 && player.velocityY <= 0) {
                 // Land on top of ghost
                 player.position[1] = ghostTopY;
                 player.velocityY = 0;
                 player.isJumping = false;
+                standingOnGhost = true;
                 continue;  // Skip horizontal collision for this ghost
             }
-        }
 
-        // Horizontal collision (only if not on top)
-        if (playerBottomY < ghostTopY - 0.1) {
-            if (horizontalDist < minHorizontalDist && horizontalDist > 0.001) {
-                const overlap = minHorizontalDist - horizontalDist;
-                player.position[0] += (dx / horizontalDist) * overlap;
-                player.position[2] += (dz / horizontalDist) * overlap;
-            } else if (horizontalDist <= 0.001) {
-                player.position[0] += minHorizontalDist;
+            // Horizontal collision (only if player is below the top of the ghost)
+            if (py < ghostTopY - 0.1) {
+                // Calculate overlaps on each axis
+                const overlapLeft = playerMaxX - ghostMinX;
+                const overlapRight = ghostMaxX - playerMinX;
+                const overlapBack = playerMaxZ - ghostMinZ;
+                const overlapFront = ghostMaxZ - playerMinZ;
+
+                // Find minimum overlap and push player out
+                const minOverlap = Math.min(overlapLeft, overlapRight, overlapBack, overlapFront);
+
+                if (minOverlap === overlapLeft) {
+                    player.position[0] = ghostMinX - playerHalf;
+                } else if (minOverlap === overlapRight) {
+                    player.position[0] = ghostMaxX + playerHalf;
+                } else if (minOverlap === overlapBack) {
+                    player.position[2] = ghostMinZ - playerHalf;
+                } else if (minOverlap === overlapFront) {
+                    player.position[2] = ghostMaxZ + playerHalf;
+                }
             }
         }
+    }
+
+    // If player is in the air and not standing on any ghost, make sure they fall
+    if (!standingOnGhost && player.position[1] > 0 && !player.isJumping && player.velocityY === 0) {
+        player.isJumping = true;  // Re-enable gravity
     }
 
     clampPlayerToRoom();
@@ -334,6 +370,6 @@ function getGhosts() {
 }
 
 function getGhostModelMatrixForFrame(frame) {
-    getGhostModelMatrix(_ghostModelMatrix, frame.x, 0, frame.z, frame.yaw);
+    getGhostModelMatrix(_ghostModelMatrix, frame.x, frame.y, frame.z, frame.yaw);
     return _ghostModelMatrix;
 }
