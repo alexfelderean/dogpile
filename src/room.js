@@ -38,6 +38,59 @@ const OBJECT_COLORS = {
 };
 
 // =============================================================================
+// DOOR CONFIGURATION
+// =============================================================================
+// Doors can be placed on Z- wall or X+ wall, centered
+// Set to null for no door, or 'z-' or 'x+' for door location
+const doorConfig = {
+    wall: 'x+',           // 'z-' or 'x+' or null
+    width: 2.5,           // Door width
+    height: 3.5,          // Door height
+    color: [0.2, 0.8, 0.6, 1.0],      // Cyan-green door
+    frameColor: [0.1, 0.1, 0.12, 1.0] // Dark frame
+};
+
+// Door collision state
+let doorCollisionLogged = false;
+
+// Check if player is colliding with the door
+function checkDoorCollision(playerX, playerZ) {
+    if (!doorConfig.wall) return false;
+
+    const roomHalf = (GRID_SIZE * CELL_SIZE) / 2;
+    const dw = doorConfig.width / 2;
+    const collisionDist = 0.5;  // How close player needs to be
+
+    if (doorConfig.wall === 'z-') {
+        // Door on back wall (Z-), centered at X=0
+        const nearWall = playerZ < -roomHalf + collisionDist;
+        const inDoorX = playerX > -dw && playerX < dw;
+        return nearWall && inDoorX;
+    } else if (doorConfig.wall === 'x+') {
+        // Door on right wall (X+), centered at Z=0
+        const nearWall = playerX > roomHalf - collisionDist;
+        const inDoorZ = playerZ > -dw && playerZ < dw;
+        return nearWall && inDoorZ;
+    }
+
+    return false;
+}
+
+// Update door collision (call each frame)
+function updateDoorCollision() {
+    const isColliding = checkDoorCollision(player.position[0], player.position[2]);
+
+    if (isColliding && !doorCollisionLogged) {
+        console.log('Door collision detected!');
+        doorCollisionLogged = true;
+    } else if (!isColliding) {
+        doorCollisionLogged = false;
+    }
+
+    return isColliding;
+}
+
+// =============================================================================
 // GEOMETRY CREATION
 // =============================================================================
 function createRoomGeometry() {
@@ -140,6 +193,39 @@ function createRoomGeometry() {
         [roomHalf, 0, roomHalf],
         wallColor
     );
+
+    // --- DOOR (rendered on top of wall) ---
+    if (doorConfig.wall) {
+        const dw = doorConfig.width / 2;
+        const dh = doorConfig.height;
+        const offset = 0.02;  // Offset from wall to prevent z-fighting
+
+        if (doorConfig.wall === 'z-') {
+            // Door on back wall (Z-), centered at X=0
+            const z = -roomHalf + offset;
+
+            // Door panel
+            addQuad(
+                [-dw, 0, z],
+                [-dw, dh, z],
+                [dw, dh, z],
+                [dw, 0, z],
+                doorConfig.color
+            );
+        } else if (doorConfig.wall === 'x+') {
+            // Door on right wall (X+), centered at Z=0
+            const x = roomHalf - offset;
+
+            // Door panel
+            addQuad(
+                [x, 0, -dw],
+                [x, dh, -dw],
+                [x, dh, dw],
+                [x, 0, dw],
+                doorConfig.color
+            );
+        }
+    }
 
     // --- GRID OBJECTS ---
     const cubeSize = CELL_SIZE;

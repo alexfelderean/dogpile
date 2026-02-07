@@ -163,6 +163,9 @@ function main() {
 
             // Update pressure plates
             updatePressurePlates();
+
+            // Check door collision
+            updateDoorCollision();
         }
 
         // Clear and render
