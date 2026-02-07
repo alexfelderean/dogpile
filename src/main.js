@@ -1,6 +1,6 @@
-import { mat4Orthographic, mat4IsometricView, mat4Identity, calculateIsometricFitBounds, _viewMatrix, _projMatrix, compileShader } from './math.js';
+import { mat4Orthographic, mat4IsometricView, mat4Identity, mat4Translate, mat4RotateY, calculateIsometricFitBounds, _viewMatrix, _projMatrix, compileShader } from './math.js';
 import { player, setupPlayerInput, updatePlayer, getPlayerPosition, getPlayerYaw, hasPlayerInput, isPlayerActive, resetPlayer } from './player.js';
-import { startTimeLoop, isWaitingForInput, isTimeLoopRunning, setTimeLoopRunning, updateTimeLoop, recordFrame, handleGhostCollisions, getGhosts, getGhostFrame, getGhostModelMatrix, getGhostModelMatrixForFrame, getGhostOpacity, clearGhosts, createGhostGeometry, createPlayerGeometry, createShadowGeometry, createGhostLegGeometry, createPlayerLegGeometry, LEG_POSITIONS, LEG_PIVOT_Y, DOG_VISUAL_SCALE } from './ghost.js';
+import { startTimeLoop, isWaitingForInput, isTimeLoopRunning, setTimeLoopRunning, updateTimeLoop, recordFrame, handleGhostCollisions, getGhosts, getGhostFrame, getGhostModelMatrix, getGhostModelMatrixForFrame, getGhostOpacity, clearGhosts, getCurrentPlayerColor, createPlayerGeometry, createPlayerLegGeometry, createPlayerTailGeometry, createPlayerGeometryBlack, createPlayerGeometryWheaten, createPlayerGeometryBrindle, createPlayerLegGeometryBlack, createPlayerLegGeometryWheaten, createPlayerLegGeometryBrindle, createPlayerTailGeometryBlack, createPlayerTailGeometryWheaten, createPlayerTailGeometryBrindle, createShadowGeometry, createGhostGeometryBlack, createGhostGeometryWheaten, createGhostGeometryBrindle, createGhostLegGeometryBlack, createGhostLegGeometryWheaten, createGhostLegGeometryBrindle, createGhostTailGeometryBlack, createGhostTailGeometryWheaten, createGhostTailGeometryBrindle, LEG_POSITIONS, LEG_PIVOT_Y, TAIL_PIVOT_Y, TAIL_OFFSET_Z, DOG_VISUAL_SCALE } from './ghost.js';
 import { updatePressurePlates } from './pressureplate.js';
 import { updatePistons, handlePistonCollisions } from './piston.js';
 import { loadLevel, createRoomGeometry, createArrowGeometry, createWallGeometry, handleLevelTileCollisions, updateDoorCollision, updateDoorLockState, GRID_SIZE, CELL_SIZE, ROOM_HEIGHT } from './room.js';
@@ -33,7 +33,7 @@ async function main() {
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return;
     let room = createRoomGeometry(), arrow = createArrowGeometry(), wallGeom = createWallGeometry();
-    const ghostGeom = createGhostGeometry(), playerGeom = createPlayerGeometry(), shadowGeom = createShadowGeometry();
+    const playerGeom = createPlayerGeometry(), shadowGeom = createShadowGeometry();
     let indexCount = room.indexCount, arrowIndexCount = arrow.indexCount;
     updateWallBuffers(gl, wallGeom);
     let floorGeom = createFloorGeometry();
@@ -111,60 +111,72 @@ async function main() {
     const arrowIdxBuf = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, arrowIdxBuf);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, arrow.indices, gl.STATIC_DRAW);
-    const ghostPosBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, ghostPosBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, ghostGeom.positions, gl.STATIC_DRAW);
-    const ghostColBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, ghostColBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, ghostGeom.colors, gl.STATIC_DRAW);
-    const ghostIdxBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ghostIdxBuf);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, ghostGeom.indices, gl.STATIC_DRAW);
-    const ghostNormBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, ghostNormBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, ghostGeom.normals, gl.STATIC_DRAW);
-    // Leg geometry for ghosts
-    const ghostLegGeom = createGhostLegGeometry();
-    const ghostLegPosBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, ghostLegPosBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, ghostLegGeom.positions, gl.STATIC_DRAW);
-    const ghostLegColBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, ghostLegColBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, ghostLegGeom.colors, gl.STATIC_DRAW);
-    const ghostLegNormBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, ghostLegNormBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, ghostLegGeom.normals, gl.STATIC_DRAW);
-    const ghostLegIdxBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ghostLegIdxBuf);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, ghostLegGeom.indices, gl.STATIC_DRAW);
-    const ghostLegIndexCount = ghostLegGeom.indexCount;
-    const playerPosBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, playerPosBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, playerGeom.positions, gl.STATIC_DRAW);
-    const playerColBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, playerColBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, playerGeom.colors, gl.STATIC_DRAW);
-    const playerIdxBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerIdxBuf);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, playerGeom.indices, gl.STATIC_DRAW);
-    const playerNormBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, playerNormBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, playerGeom.normals, gl.STATIC_DRAW);
-    // Leg geometry for player
-    const playerLegGeom = createPlayerLegGeometry();
-    const playerLegPosBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, playerLegPosBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, playerLegGeom.positions, gl.STATIC_DRAW);
-    const playerLegColBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, playerLegColBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, playerLegGeom.colors, gl.STATIC_DRAW);
-    const playerLegNormBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, playerLegNormBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, playerLegGeom.normals, gl.STATIC_DRAW);
-    const playerLegIdxBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerLegIdxBuf);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, playerLegGeom.indices, gl.STATIC_DRAW);
-    const playerLegIndexCount = playerLegGeom.indexCount;
+    // Ghost Geometries (3 Types)
+    const ghostGeoms = [createGhostGeometryBlack(), createGhostGeometryWheaten(), createGhostGeometryBrindle()];
+    const ghostPosBufs = [], ghostColBufs = [], ghostNormBufs = [], ghostIdxBufs = [], ghostIndexCounts = [];
+    for (const g of ghostGeoms) {
+        const pb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, pb); gl.bufferData(gl.ARRAY_BUFFER, g.positions, gl.STATIC_DRAW); ghostPosBufs.push(pb);
+        const cb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cb); gl.bufferData(gl.ARRAY_BUFFER, g.colors, gl.STATIC_DRAW); ghostColBufs.push(cb);
+        const nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, nb); gl.bufferData(gl.ARRAY_BUFFER, g.normals, gl.STATIC_DRAW); ghostNormBufs.push(nb);
+        const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g.indices, gl.STATIC_DRAW); ghostIdxBufs.push(ib);
+        ghostIndexCounts.push(g.indexCount);
+    }
+    
+    // Ghost Legs (3 Types)
+    const ghostLegGeoms = [createGhostLegGeometryBlack(), createGhostLegGeometryWheaten(), createGhostLegGeometryBrindle()];
+    const ghostLegPosBufs = [], ghostLegColBufs = [], ghostLegNormBufs = [], ghostLegIdxBufs = [];
+    for (const g of ghostLegGeoms) {
+        const pb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, pb); gl.bufferData(gl.ARRAY_BUFFER, g.positions, gl.STATIC_DRAW); ghostLegPosBufs.push(pb);
+        const cb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cb); gl.bufferData(gl.ARRAY_BUFFER, g.colors, gl.STATIC_DRAW); ghostLegColBufs.push(cb);
+        const nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, nb); gl.bufferData(gl.ARRAY_BUFFER, g.normals, gl.STATIC_DRAW); ghostLegNormBufs.push(nb);
+        const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g.indices, gl.STATIC_DRAW); ghostLegIdxBufs.push(ib);
+    }
+    const ghostLegIndexCount = ghostLegGeoms[0].indexCount;
+
+    // Ghost Tails (3 Types)
+    const ghostTailGeoms = [createGhostTailGeometryBlack(), createGhostTailGeometryWheaten(), createGhostTailGeometryBrindle()];
+    const ghostTailPosBufs = [], ghostTailColBufs = [], ghostTailNormBufs = [], ghostTailIdxBufs = [];
+    for (const g of ghostTailGeoms) {
+        const pb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, pb); gl.bufferData(gl.ARRAY_BUFFER, g.positions, gl.STATIC_DRAW); ghostTailPosBufs.push(pb);
+        const cb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cb); gl.bufferData(gl.ARRAY_BUFFER, g.colors, gl.STATIC_DRAW); ghostTailColBufs.push(cb);
+        const nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, nb); gl.bufferData(gl.ARRAY_BUFFER, g.normals, gl.STATIC_DRAW); ghostTailNormBufs.push(nb);
+        const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g.indices, gl.STATIC_DRAW); ghostTailIdxBufs.push(ib);
+    }
+    const ghostTailIndexCount = ghostTailGeoms[0].indexCount;
+    
+    // Player Geometries (3 Types - all with scarf)
+    const playerGeoms = [createPlayerGeometryBlack(), createPlayerGeometryWheaten(), createPlayerGeometryBrindle()];
+    const playerPosBufs = [], playerColBufs = [], playerNormBufs = [], playerIdxBufs = [], playerIndexCounts = [];
+    for (const g of playerGeoms) {
+        const pb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, pb); gl.bufferData(gl.ARRAY_BUFFER, g.positions, gl.STATIC_DRAW); playerPosBufs.push(pb);
+        const cb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cb); gl.bufferData(gl.ARRAY_BUFFER, g.colors, gl.STATIC_DRAW); playerColBufs.push(cb);
+        const nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, nb); gl.bufferData(gl.ARRAY_BUFFER, g.normals, gl.STATIC_DRAW); playerNormBufs.push(nb);
+        const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g.indices, gl.STATIC_DRAW); playerIdxBufs.push(ib);
+        playerIndexCounts.push(g.indexCount);
+    }
+
+    // Player Legs (3 Types)
+    const playerLegGeoms = [createPlayerLegGeometryBlack(), createPlayerLegGeometryWheaten(), createPlayerLegGeometryBrindle()];
+    const playerLegPosBufs = [], playerLegColBufs = [], playerLegNormBufs = [], playerLegIdxBufs = [];
+    for (const g of playerLegGeoms) {
+        const pb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, pb); gl.bufferData(gl.ARRAY_BUFFER, g.positions, gl.STATIC_DRAW); playerLegPosBufs.push(pb);
+        const cb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cb); gl.bufferData(gl.ARRAY_BUFFER, g.colors, gl.STATIC_DRAW); playerLegColBufs.push(cb);
+        const nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, nb); gl.bufferData(gl.ARRAY_BUFFER, g.normals, gl.STATIC_DRAW); playerLegNormBufs.push(nb);
+        const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g.indices, gl.STATIC_DRAW); playerLegIdxBufs.push(ib);
+    }
+    const playerLegIndexCount = playerLegGeoms[0].indexCount;
+
+    // Player Tails (3 Types)
+    const playerTailGeoms = [createPlayerTailGeometryBlack(), createPlayerTailGeometryWheaten(), createPlayerTailGeometryBrindle()];
+    const playerTailPosBufs = [], playerTailColBufs = [], playerTailNormBufs = [], playerTailIdxBufs = [];
+    for (const g of playerTailGeoms) {
+        const pb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, pb); gl.bufferData(gl.ARRAY_BUFFER, g.positions, gl.STATIC_DRAW); playerTailPosBufs.push(pb);
+        const cb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cb); gl.bufferData(gl.ARRAY_BUFFER, g.colors, gl.STATIC_DRAW); playerTailColBufs.push(cb);
+        const nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, nb); gl.bufferData(gl.ARRAY_BUFFER, g.normals, gl.STATIC_DRAW); playerTailNormBufs.push(nb);
+        const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g.indices, gl.STATIC_DRAW); playerTailIdxBufs.push(ib);
+    }
+    const playerTailIndexCount = playerTailGeoms[0].indexCount;
+    
     // Animation state
     let playerLegPhase = 0, lastPlayerPos = [0, 0, 0];
     const shadowPosBuf = gl.createBuffer();
@@ -220,7 +232,6 @@ async function main() {
     gl.uniform3f(uAmbientColor, 0.5, 0.5, 0.55);
     gl.uniform3f(uLightColor, 0.6, 0.58, 0.5);
     gl.uniform1f(u_globalAlpha, 1.0);
-    const ghostIndexCount = ghostGeom.indexCount;
     const playerIndexCount = playerGeom.indexCount;
     setupPlayerInput(canvas, () => { if (isWaitingForInput()) { startTimeLoop(performance.now()); return true; } return false; });
     const roomModelMatrix = new Float32Array(16);
@@ -317,7 +328,7 @@ async function main() {
         gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, shadowIdxBuf);
         // Player shadow
-        getGhostModelMatrix(characterModelMatrix, playerPos[0], 0, playerPos[2], 0);
+        getGhostModelMatrix(characterModelMatrix, playerPos[0], 0, playerPos[2], getPlayerYaw());
         characterModelMatrix[13] += levelTransitionY;
         gl.uniformMatrix4fv(uModelMatrix, false, characterModelMatrix);
         gl.drawElements(gl.TRIANGLES, shadowIndexCount, gl.UNSIGNED_SHORT, 0);
@@ -326,7 +337,7 @@ async function main() {
         for (const ghost of ghostListForShadows) {
             const frame = getGhostFrame(ghost);
             if (frame) {
-                getGhostModelMatrix(characterModelMatrix, frame.x, 0, frame.z, 0);
+                getGhostModelMatrix(characterModelMatrix, frame.x, 0, frame.z, frame.yaw);
                 characterModelMatrix[13] += levelTransitionY;
                 gl.uniformMatrix4fv(uModelMatrix, false, characterModelMatrix);
                 gl.drawElements(gl.TRIANGLES, shadowIndexCount, gl.UNSIGNED_SHORT, 0);
@@ -334,9 +345,10 @@ async function main() {
         }
         // ---------------------------
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, playerPosBuf);
+        const currentPlayerColor = getCurrentPlayerColor();
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerPosBufs[currentPlayerColor]);
         gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
-        gl.bindBuffer(gl.ARRAY_BUFFER, playerNormBuf);
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerNormBufs[currentPlayerColor]);
         gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
 
         // --- PLAYER OUTLINE PASS ---
@@ -355,8 +367,8 @@ async function main() {
         outlineMatrix[8] *= outlineScale; outlineMatrix[9] *= outlineScale; outlineMatrix[10] *= outlineScale;
 
         gl.uniformMatrix4fv(uModelMatrix, false, outlineMatrix);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerIdxBuf);
-        gl.drawElements(gl.TRIANGLES, playerIndexCount, gl.UNSIGNED_SHORT, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerIdxBufs[currentPlayerColor]);
+        gl.drawElements(gl.TRIANGLES, playerIndexCounts[currentPlayerColor], gl.UNSIGNED_SHORT, 0);
 
         gl.disable(gl.CULL_FACE);
         gl.cullFace(gl.BACK);
@@ -364,11 +376,11 @@ async function main() {
         // ---------------------------
 
         // Helper to render legs
-        function renderLegs(pos, yaw, legPhase, isGhost, opacity = 1.0) {
+        function renderLegs(pos, yaw, legPhase, isGhost, opacity = 1.0, type = 0) {
             const legGeomIndexCount = isGhost ? ghostLegIndexCount : playerLegIndexCount;
             const legBufs = isGhost ? 
-                { pos: ghostLegPosBuf, norm: ghostLegNormBuf, col: ghostLegColBuf, idx: ghostLegIdxBuf } :
-                { pos: playerLegPosBuf, norm: playerLegNormBuf, col: playerLegColBuf, idx: playerLegIdxBuf };
+                { pos: ghostLegPosBufs[type], norm: ghostLegNormBufs[type], col: ghostLegColBufs[type], idx: ghostLegIdxBufs[type] } :
+                { pos: playerLegPosBufs[currentPlayerColor], norm: playerLegNormBufs[currentPlayerColor], col: playerLegColBufs[currentPlayerColor], idx: playerLegIdxBufs[currentPlayerColor] };
 
             gl.bindBuffer(gl.ARRAY_BUFFER, legBufs.pos);
             gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
@@ -534,13 +546,13 @@ async function main() {
         }
 
         // Setup player legs
-        gl.bindBuffer(gl.ARRAY_BUFFER, playerPosBuf);
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerPosBufs[currentPlayerColor]);
         gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
-        gl.bindBuffer(gl.ARRAY_BUFFER, playerNormBuf);
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerNormBufs[currentPlayerColor]);
         gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
-        gl.bindBuffer(gl.ARRAY_BUFFER, playerColBuf);
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerColBufs[currentPlayerColor]);
         gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerIdxBuf);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerIdxBufs[currentPlayerColor]);
 
         // Update player leg animation
         const px = playerPos[0], py = playerPos[1], pz = playerPos[2];
@@ -560,55 +572,105 @@ async function main() {
         getGhostModelMatrix(characterModelMatrix, px, py, pz, getPlayerYaw());
         characterModelMatrix[13] += levelTransitionY;
         gl.uniformMatrix4fv(uModelMatrix, false, characterModelMatrix);
-        gl.drawElements(gl.TRIANGLES, playerIndexCount, gl.UNSIGNED_SHORT, 0);
+        gl.drawElements(gl.TRIANGLES, playerIndexCounts[currentPlayerColor], gl.UNSIGNED_SHORT, 0);
         
         // Player Legs
         renderLegs(playerPos, getPlayerYaw(), playerLegPhase, false);
 
+        // Player Tail
+        const tailPhase = timestamp * 0.008;
+        const tailWag = Math.sin(tailPhase) * 0.4;
+        const tailMatrix = new Float32Array(16);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerTailPosBufs[currentPlayerColor]);
+        gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerTailNormBufs[currentPlayerColor]);
+        gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerTailColBufs[currentPlayerColor]);
+        gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerTailIdxBufs[currentPlayerColor]);
+        
+        getGhostModelMatrix(tailMatrix, px, py, pz, getPlayerYaw());
+        tailMatrix[13] += levelTransitionY;
+        mat4Translate(tailMatrix, 0, TAIL_PIVOT_Y, TAIL_OFFSET_Z);
+        mat4RotateY(tailMatrix, tailWag);
+        gl.uniformMatrix4fv(uModelMatrix, false, tailMatrix);
+        gl.drawElements(gl.TRIANGLES, playerTailIndexCount, gl.UNSIGNED_SHORT, 0);
+
         // Ghosts
         const ghostList = getGhosts();
         if (ghostList.length > 0) {
-            // Ghost Bodies
-            gl.bindBuffer(gl.ARRAY_BUFFER, ghostPosBuf);
-            gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
-            gl.bindBuffer(gl.ARRAY_BUFFER, ghostNormBuf);
-            gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
-            gl.bindBuffer(gl.ARRAY_BUFFER, ghostColBuf);
-            gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ghostIdxBuf);
-            
-            gl.uniform1i(uUseTexture, 0);
-            
-            for (const ghost of ghostList) {
-                const opacity = getGhostOpacity(timestamp);
-                gl.uniform1f(u_globalAlpha, opacity);
+            for (let type = 0; type < 3; type++) {
+                // Ghost Bodies
+                gl.bindBuffer(gl.ARRAY_BUFFER, ghostPosBufs[type]);
+                gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ARRAY_BUFFER, ghostNormBufs[type]);
+                gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ARRAY_BUFFER, ghostColBufs[type]);
+                gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ghostIdxBufs[type]);
                 
-                const frame = getGhostFrame(ghost);
-                if (frame) {
-                    // Update ghost leg phase
-                    if (!ghost.legPhase) ghost.legPhase = 0;
-                    if (ghost.lastX !== undefined) {
-                        const dist = Math.hypot(frame.x - ghost.lastX, frame.z - ghost.lastZ);
-                        if (dist > 0.001) ghost.legPhase += dist * 4.5;
-                    }
-                    ghost.lastX = frame.x; ghost.lastZ = frame.z;
+                gl.uniform1i(uUseTexture, 0);
+                
+                for (const ghost of ghostList) {
+                    if ((ghost.colorType || 0) !== type) continue;
+                    
+                    const opacity = getGhostOpacity(timestamp);
+                    gl.uniform1f(u_globalAlpha, opacity);
+                    
+                    const frame = getGhostFrame(ghost);
+                    if (frame) {
+                        // Update ghost leg phase
+                        if (!ghost.legPhase) ghost.legPhase = 0;
+                        if (ghost.lastX !== undefined) {
+                            const dist = Math.hypot(frame.x - ghost.lastX, frame.z - ghost.lastZ);
+                            if (dist > 0.001) ghost.legPhase += dist * 4.5;
+                        }
+                        ghost.lastX = frame.x; ghost.lastZ = frame.z;
 
-                    const modelMatrix = getGhostModelMatrixForFrame(frame);
-                    modelMatrix[13] += levelTransitionY;
-                    gl.uniformMatrix4fv(uModelMatrix, false, modelMatrix);
-                    gl.drawElements(gl.TRIANGLES, ghostIndexCount, gl.UNSIGNED_SHORT, 0);
-                    
-                    // Ghost Legs
-                    renderLegs([frame.x, frame.y, frame.z], frame.yaw, ghost.legPhase, true, opacity);
-                    
-                    // Restore buffers for next ghost body (renderLegs changes them)
-                    gl.bindBuffer(gl.ARRAY_BUFFER, ghostPosBuf);
-                    gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
-                    gl.bindBuffer(gl.ARRAY_BUFFER, ghostNormBuf);
-                    gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
-                    gl.bindBuffer(gl.ARRAY_BUFFER, ghostColBuf);
-                    gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
-                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ghostIdxBuf);
+                        const modelMatrix = getGhostModelMatrixForFrame(frame);
+                        modelMatrix[13] += levelTransitionY;
+                        gl.uniformMatrix4fv(uModelMatrix, false, modelMatrix);
+                        gl.drawElements(gl.TRIANGLES, ghostIndexCounts[type], gl.UNSIGNED_SHORT, 0);
+                    }
+                }
+                
+                // Ghost Legs
+                for (const ghost of ghostList) {
+                    if ((ghost.colorType || 0) !== type) continue;
+                    const frame = getGhostFrame(ghost);
+                    if (frame) {
+                        const opacity = getGhostOpacity(timestamp);
+                        renderLegs([frame.x, frame.y, frame.z], frame.yaw, ghost.legPhase, true, opacity, type);
+                    }
+                }
+                
+                // Ghost Tails
+                const tailPhase = timestamp * 0.008;
+                const tailWag = Math.sin(tailPhase) * 0.4;
+                const tailMatrix = new Float32Array(16);
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, ghostTailPosBufs[type]);
+                gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ARRAY_BUFFER, ghostTailNormBufs[type]);
+                gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ARRAY_BUFFER, ghostTailColBufs[type]);
+                gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ghostTailIdxBufs[type]);
+
+                for (const ghost of ghostList) {
+                    if ((ghost.colorType || 0) !== type) continue;
+                    const opacity = getGhostOpacity(timestamp);
+                    gl.uniform1f(u_globalAlpha, opacity);
+                    const frame = getGhostFrame(ghost);
+                    if (frame) {
+                        getGhostModelMatrix(tailMatrix, frame.x, frame.y, frame.z, frame.yaw);
+                        tailMatrix[13] += levelTransitionY;
+                        mat4Translate(tailMatrix, 0, TAIL_PIVOT_Y, TAIL_OFFSET_Z);
+                        mat4RotateY(tailMatrix, tailWag);
+                        gl.uniformMatrix4fv(uModelMatrix, false, tailMatrix);
+                        gl.drawElements(gl.TRIANGLES, ghostTailIndexCount, gl.UNSIGNED_SHORT, 0);
+                    }
                 }
             }
         }
