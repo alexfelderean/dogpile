@@ -277,6 +277,31 @@ async function main() {
         gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ARRAY_BUFFER, playerNormBuf);
         gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+
+        // --- PLAYER OUTLINE PASS ---
+        gl.enable(gl.CULL_FACE);
+        gl.cullFace(gl.FRONT);    // Draw only back faces
+        gl.disableVertexAttribArray(aColor);
+        gl.vertexAttrib4f(aColor, 1.0, 1.0, 0.0, 1.0); // Yellow
+        gl.uniform1i(uUseTexture, 0); // No texture
+
+        getGhostModelMatrix(characterModelMatrix, playerPos[0], playerPos[1], playerPos[2], getPlayerYaw());
+        characterModelMatrix[13] += levelTransitionY;
+        const outlineScale = 1.1;
+        const outlineMatrix = new Float32Array(characterModelMatrix);
+        outlineMatrix[0] *= outlineScale; outlineMatrix[1] *= outlineScale; outlineMatrix[2] *= outlineScale;
+        outlineMatrix[4] *= outlineScale; outlineMatrix[5] *= outlineScale; outlineMatrix[6] *= outlineScale;
+        outlineMatrix[8] *= outlineScale; outlineMatrix[9] *= outlineScale; outlineMatrix[10] *= outlineScale;
+
+        gl.uniformMatrix4fv(uModelMatrix, false, outlineMatrix);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerIdxBuf);
+        gl.drawElements(gl.TRIANGLES, playerIndexCount, gl.UNSIGNED_SHORT, 0);
+
+        gl.disable(gl.CULL_FACE);
+        gl.cullFace(gl.BACK);
+        gl.enableVertexAttribArray(aColor);
+        // ---------------------------
+
         gl.bindBuffer(gl.ARRAY_BUFFER, playerColBuf);
         gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(aTexCoord);
