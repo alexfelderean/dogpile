@@ -35,11 +35,19 @@ const jumpButton = {
     pressed: false
 };
 
+// Spawn state
+let spawnPosition = [0, 0, 0];
+
+// Set player spawn position
+function setPlayerSpawn(x, y, z) {
+    spawnPosition = [x, y, z];
+}
+
 // Reset player to starting position
 function resetPlayer() {
-    player.position[0] = 0;
-    player.position[1] = 0;
-    player.position[2] = 0;
+    player.position[0] = spawnPosition[0];
+    player.position[1] = spawnPosition[1];
+    player.position[2] = spawnPosition[2];
 }
 
 // Get player position for rendering

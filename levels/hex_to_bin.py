@@ -16,20 +16,45 @@ def main():
 
     s = sys.argv[1].replace(" ", "").strip()
     
-    # Process in chunks of 3
+    # Process Header
+    # 1. Door Wall (1 char) -> 0 or 1
+    # 2. Spawn Index (2 chars) -> Decimal 00-81
+    
+    if len(s) < 3:
+        sys.stderr.write("Error: String too short for header (need at least 3 chars)\n")
+        sys.exit(1)
+        
+    door_char = s[0]
+    spawn_str = s[1:3]
+    rest = s[3:]
+    
     result = bytearray()
     
+    try:
+        # Parse Door
+        door_val = int(door_char)
+        result.append(door_val)
+        
+        # Parse Spawn
+        spawn_val = int(spawn_str)
+        result.append(spawn_val)
+        
+    except ValueError:
+         sys.stderr.write("Error: Invalid header format\n")
+         sys.exit(1)
+
+    # Process Objects in chunks of 3
     i = 0
-    while i < len(s):
+    while i < len(rest):
         # Allow trailing characters to be ignored if incomplete
-        if i + 2 >= len(s):
+        if i + 2 >= len(rest):
             break
             
-        index_str = s[i:i+2]
-        type_str = s[i+2]
+        index_str = rest[i:i+2]
+        type_str = rest[i+2]
         
         try:
-            # Parse Index as Decimal (per "13b -> 13" instruction)
+            # Parse Index as Decimal
             index = int(index_str) 
             
             # Parse Type as Hex
@@ -39,7 +64,7 @@ def main():
             result.append(type_val)
             
         except ValueError:
-            sys.stderr.write(f"Error parsing chunk '{s[i:i+3]}'\n")
+            sys.stderr.write(f"Error parsing chunk '{rest[i:i+3]}'\n")
             sys.exit(1)
             
         i += 3

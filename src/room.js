@@ -51,9 +51,24 @@ async function loadLevel(levelPath) {
         CELL_SIZE = 2;
         ROOM_HEIGHT = GRID_SIZE * CELL_SIZE;
 
+        // Parse Header
+        // Byte 0: Door Wall (0=z-, 1=x+)
+        const doorWallByte = view[0];
+        const doorWall = (doorWallByte === 1) ? 'x+' : 'z-';
+
+        // Byte 1: Spawn Index
+        const spawnIndex = view[1];
+        const spawnRow = Math.floor(spawnIndex / 9);
+        const spawnCol = spawnIndex % 9;
+
+        // Convert spawn grid to world positions
+        const roomHalf = (GRID_SIZE * CELL_SIZE) / 2;
+        const spawnX = (spawnCol * CELL_SIZE) - roomHalf + (CELL_SIZE / 2);
+        const spawnZ = (spawnRow * CELL_SIZE) - roomHalf + (CELL_SIZE / 2);
+
         // Parse sparse binary data: [Index, Type, Index, Type, ...]
-        // Index is 0-80. Type is 0xA (arrow), 0xB (plate), 0xC (exit)
-        for (let i = 0; i < view.length; i += 2) {
+        // Start at index 2 (skip header)
+        for (let i = 2; i < view.length; i += 2) {
             // Safety check for incomplete pair
             if (i + 1 >= view.length) break;
 
@@ -74,13 +89,17 @@ async function loadLevel(levelPath) {
             }
         }
 
-        // Default door config (since binary doesn't contain it yet)
         doorConfig = {
-            wall: "x+",
+            wall: doorWall,
             width: 2.5,
             height: 3.5,
             color: [0.2, 0.8, 0.6, 1.0]
         };
+
+        // Set player spawn (using global function from player.js)
+        if (typeof setPlayerSpawn === 'function') {
+            setPlayerSpawn(spawnX, 0, spawnZ);
+        }
 
         // Store raw buffer as currentLevel (or wrapper)
         currentLevel = { grid: levelGrid, door: doorConfig };
