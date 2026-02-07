@@ -76,3 +76,56 @@ function mat4RotateY(out, rad) {
     out[8] = a00 * s + a20 * c; out[9] = a01 * s + a21 * c;
     out[10] = a02 * s + a22 * c; out[11] = a03 * s + a23 * c;
 }
+
+// Calculate orthographic bounds to fit the room in isometric view
+// Returns the optimal viewSize to fit the room with the given margin
+function calculateIsometricFitBounds(roomSize, roomHeight, marginPercent = 0.15) {
+    // Room bounds in world space (centered at origin)
+    const halfSize = roomSize / 2;
+    
+    // 8 corners of the room box
+    const corners = [
+        [-halfSize, 0, -halfSize],
+        [halfSize, 0, -halfSize],
+        [halfSize, 0, halfSize],
+        [-halfSize, 0, halfSize],
+        [-halfSize, roomHeight, -halfSize],
+        [halfSize, roomHeight, -halfSize],
+        [halfSize, roomHeight, halfSize],
+        [-halfSize, roomHeight, halfSize]
+    ];
+    
+    // Transform each corner through the isometric view
+    const yaw = Math.PI / 4;
+    const pitch = Math.atan(1 / Math.sqrt(2));
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    
+    for (const [x, y, z] of corners) {
+        // Apply rotation (same as in mat4IsometricView)
+        const tx = cy * x + sy * z;
+        const ty = sy * sp * x + cp * y - cy * sp * z;
+        
+        minX = Math.min(minX, tx);
+        maxX = Math.max(maxX, tx);
+        minY = Math.min(minY, ty);
+        maxY = Math.max(maxY, ty);
+    }
+    
+    // Calculate the span needed
+    const spanX = maxX - minX;
+    const spanY = maxY - minY;
+    
+    // Add margin
+    const margin = 1 + marginPercent;
+    
+    return {
+        spanX: spanX * margin,
+        spanY: spanY * margin,
+        centerX: (minX + maxX) / 2,
+        centerY: (minY + maxY) / 2
+    };
+}
