@@ -74,6 +74,15 @@ export function getLevelDoorConfig() { return doorConfig; }
 export function getLevelRoomHalf() { return (GRID_SIZE * CELL_SIZE) / 2; }
 export { GRID_SIZE, CELL_SIZE, ROOM_HEIGHT };
 
+export function getHeightAtWorldPos(worldX, worldZ) {
+    const roomHalf = (GRID_SIZE * CELL_SIZE) / 2;
+    const col = Math.floor((worldX + roomHalf) / CELL_SIZE);
+    const row = Math.floor((worldZ + roomHalf) / CELL_SIZE);
+    
+    if (row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE) return 0;
+    return (levelHeight[row] && levelHeight[row][col]) ? levelHeight[row][col] * CELL_SIZE : 0;
+}
+
 function gridToWorldCollision(row, col) {
     return [(col - GRID_SIZE / 2 + 0.5) * CELL_SIZE, (row - GRID_SIZE / 2 + 0.5) * CELL_SIZE];
 }

@@ -3,7 +3,7 @@ import { player, setupPlayerInput, updatePlayer, getPlayerPosition, getPlayerYaw
 import { startTimeLoop, isWaitingForInput, isTimeLoopRunning, setTimeLoopRunning, updateTimeLoop, recordFrame, handleGhostCollisions, getGhosts, getGhostFrame, getGhostModelMatrix, getGhostModelMatrixForFrame, getGhostOpacity, clearGhosts, getCurrentPlayerColor, createPlayerGeometry, createPlayerLegGeometry, createPlayerTailGeometry, createPlayerGeometryBlack, createPlayerGeometryWheaten, createPlayerGeometryBrindle, createPlayerLegGeometryBlack, createPlayerLegGeometryWheaten, createPlayerLegGeometryBrindle, createPlayerTailGeometryBlack, createPlayerTailGeometryWheaten, createPlayerTailGeometryBrindle, createShadowGeometry, createGhostGeometryBlack, createGhostGeometryWheaten, createGhostGeometryBrindle, createGhostLegGeometryBlack, createGhostLegGeometryWheaten, createGhostLegGeometryBrindle, createGhostTailGeometryBlack, createGhostTailGeometryWheaten, createGhostTailGeometryBrindle, LEG_POSITIONS, LEG_PIVOT_Y, TAIL_PIVOT_Y, TAIL_OFFSET_Z, DOG_VISUAL_SCALE } from './ghost.js';
 import { updatePressurePlates } from './pressureplate.js';
 import { updatePistons, handlePistonCollisions, isPistonAnimating } from './piston.js';
-import { loadLevel, createRoomGeometry, createArrowGeometry, createWallGeometry, handleLevelTileCollisions, updateDoorCollision, updateDoorLockState, GRID_SIZE, CELL_SIZE, ROOM_HEIGHT } from './room.js';
+import { loadLevel, createRoomGeometry, createArrowGeometry, createWallGeometry, handleLevelTileCollisions, updateDoorCollision, updateDoorLockState, getHeightAtWorldPos, GRID_SIZE, CELL_SIZE, ROOM_HEIGHT } from './room.js';
 import { initFloorShader, createFloorGeometry, updateFloorBuffers, renderFloor } from './floor.js';
 import { initWallShader, updateWallBuffers, renderWalls } from './wall.js';
 import { initSkyShader, renderSky } from './sky.js';
@@ -330,7 +330,8 @@ async function main() {
         gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, shadowIdxBuf);
         // Player shadow
-        getGhostModelMatrix(characterModelMatrix, playerPos[0], 0, playerPos[2], getPlayerYaw());
+        const playerShadowHeight = getHeightAtWorldPos(playerPos[0], playerPos[2]);
+        getGhostModelMatrix(characterModelMatrix, playerPos[0], playerShadowHeight, playerPos[2], getPlayerYaw());
         characterModelMatrix[13] += levelTransitionY;
         gl.uniformMatrix4fv(uModelMatrix, false, characterModelMatrix);
         gl.drawElements(gl.TRIANGLES, shadowIndexCount, gl.UNSIGNED_SHORT, 0);
@@ -339,7 +340,8 @@ async function main() {
         for (const ghost of ghostListForShadows) {
             const frame = getGhostFrame(ghost);
             if (frame) {
-                getGhostModelMatrix(characterModelMatrix, frame.x, 0, frame.z, frame.yaw);
+                const ghostShadowHeight = getHeightAtWorldPos(frame.x, frame.z);
+                getGhostModelMatrix(characterModelMatrix, frame.x, ghostShadowHeight, frame.z, frame.yaw);
                 characterModelMatrix[13] += levelTransitionY;
                 gl.uniformMatrix4fv(uModelMatrix, false, characterModelMatrix);
                 gl.drawElements(gl.TRIANGLES, shadowIndexCount, gl.UNSIGNED_SHORT, 0);
