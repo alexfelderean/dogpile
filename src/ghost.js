@@ -4,8 +4,9 @@ import { resetPressurePlates } from './pressureplate.js';
 import { resetPistons } from './piston.js';
 import { resetDoorState } from './room.js';
 
-const MAX_GHOSTS = 3;
+const MAX_GHOSTS = 4;
 const ghosts = [];
+let currentGhostIndex = 0; // Track which slot we're currently recording
 let currentRecording = [];
 let currentPlayerColor = 0; // 0=black, 1=wheaten, 2=brindle
 const timeLoop = {
@@ -19,12 +20,24 @@ export function startTimeLoop(timestamp) {
     timeLoop.startTime = timestamp;
     timeLoop.collisionStartTime = timestamp;
     timeLoop.lastRecordTime = 0;
+    updateGhostCountUI();
 }
 
 export function resetTimeLoop() {
     if (currentRecording.length > 0) {
-        ghosts.push({ frames: currentRecording, currentFrame: 0, colorType: currentPlayerColor });
-        if (ghosts.length > MAX_GHOSTS) ghosts.shift();
+        const newGhost = { frames: currentRecording, currentFrame: 0, colorType: currentPlayerColor };
+        
+        if (ghosts.length < MAX_GHOSTS) {
+            // Still filling up initial slots
+            ghosts.push(newGhost);
+        } else {
+            // All slots filled, replace the current index
+            ghosts[currentGhostIndex] = newGhost;
+        }
+        
+        // Move to next slot (wrapping around)
+        currentGhostIndex = (currentGhostIndex + 1) % MAX_GHOSTS;
+        
         updateGhostCountUI();
         // Cycle to next player color
         currentPlayerColor = (currentPlayerColor + 1) % 3;
@@ -305,7 +318,35 @@ function updateTimerUI(elapsed) {
 }
 
 function updateGhostCountUI() {
-    document.getElementById('gc').textContent = `Ghosts: ${ghosts.length}/${MAX_GHOSTS}`;
+    const container = document.getElementById('gc');
+    
+    // Create circles if they don't exist
+    if (container.children.length !== MAX_GHOSTS) {
+        container.innerHTML = '';
+        for (let i = 0; i < MAX_GHOSTS; i++) {
+            const circle = document.createElement('div');
+            circle.className = 'ghost-circle';
+            container.appendChild(circle);
+        }
+    }
+    
+    // Update circle states
+    const circles = container.children;
+    for (let i = 0; i < MAX_GHOSTS; i++) {
+        if (i === currentGhostIndex && timeLoop.isRunning) {
+            // Current running dog is yellow (the slot we're currently recording)
+            circles[i].className = 'ghost-circle yellow';
+        } else if (ghosts.length < MAX_GHOSTS && i < ghosts.length) {
+            // Past ghosts are green (when still filling up)
+            circles[i].className = 'ghost-circle green';
+        } else if (ghosts.length >= MAX_GHOSTS && i < MAX_GHOSTS) {
+            // All slots filled - show green for all non-current slots
+            circles[i].className = ghosts[i] ? 'ghost-circle green' : 'ghost-circle gray';
+        } else {
+            // Not yet used slots are gray
+            circles[i].className = 'ghost-circle gray';
+        }
+    }
 }
 
 export function updateTimeLoop(timestamp) {

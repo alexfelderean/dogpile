@@ -35,11 +35,12 @@
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
-            width: 300px;
-            height: 8px;
+            width: 400px;
+            max-width: calc(100vw - 40px);
+            height: 16px;
             background: rgba(0, 0, 0, .5);
-            border: 1px solid rgba(255, 255, 255, .3);
-            border-radius: 4px;
+            border: 2px solid rgba(255, 255, 255, .3);
+            border-radius: 8px;
             z-index: 5;
             overflow: hidden
         }
@@ -49,7 +50,7 @@
             width: 100%;
             background: linear-gradient(90deg, #4ecdc4, #44a08d);
             transition: width .05s linear;
-            border-radius: 3px
+            border-radius: 6px
         }
 
         #tf.w {
@@ -74,12 +75,36 @@
 
         #gc {
             position: fixed;
-            top: 35px;
+            top: 45px;
             left: 50%;
             transform: translateX(-50%);
-            color: rgba(255, 255, 255, .6);
-            font: 12px sans-serif;
+            display: flex;
+            gap: 12px;
             z-index: 5
+        }
+
+        .ghost-circle {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, .4);
+            transition: all .3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, .3)
+        }
+
+        .ghost-circle.gray {
+            background: rgba(128, 128, 128, .3)
+        }
+
+        .ghost-circle.green {
+            background: linear-gradient(135deg, #4ecdc4, #44a08d);
+            box-shadow: 0 2px 12px rgba(68, 160, 141, .5)
+        }
+
+        .ghost-circle.yellow {
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+            box-shadow: 0 2px 12px rgba(255, 215, 0, .6);
+            transform: scale(1.15)
         }
 
         #jz {
@@ -165,7 +190,7 @@
     <div id="t" class="h">
         <div id="tf"></div>
     </div>
-    <div id="gc" class="h">Ghosts: 0/8</div>
+    <div id="gc" class="h"></div>
     <div id="jz" class="h">
         <div id="jb">
             <div id="jk"></div>
