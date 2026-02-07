@@ -1,10 +1,10 @@
 import { player, resetPlayer, getPlayerState, clampPlayerToRoom } from './player.js';
 
-const MAX_GHOSTS = 8;
+const MAX_GHOSTS = 4;
 const ghosts = [];
 let currentRecording = [];
 const timeLoop = {
-    duration: 10, startTime: 0, isRunning: false, waitingForInput: false,
+    duration: 7, startTime: 0, isRunning: false, waitingForInput: false,
     recordInterval: 1000 / 60, lastRecordTime: 0, collisionDelayTime: 1.0, collisionStartTime: 0
 };
 const _ghostModelMatrix = new Float32Array(16);
@@ -224,13 +224,13 @@ export function createShadowGeometry() {
     const y = 0.02;
     const shadowColor = [0.0, 0.0, 0.0, 0.4];
     const positions = new Float32Array([
-        -half, y, -half,  half, y, -half,  half, y, half,  -half, y, half
+        -half, y, -half, half, y, -half, half, y, half, -half, y, half
     ]);
     const colors = new Float32Array([
         ...shadowColor, ...shadowColor, ...shadowColor, ...shadowColor
     ]);
     const normals = new Float32Array([
-        0, 1, 0,  0, 1, 0,  0, 1, 0,  0, 1, 0
+        0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0
     ]);
     const texCoords = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
     const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
