@@ -5,11 +5,15 @@
 // Store all pressure plates in the level
 const pressurePlates = [];
 
+// Track active channels
+const activeChannels = new Set();
+
 // Pressure plate class
 class PressurePlate {
-    constructor(gridRow, gridCol) {
+    constructor(gridRow, gridCol, channel = 0) {
         this.gridRow = gridRow;
         this.gridCol = gridCol;
+        this.channel = channel;
         this.isPressed = false;
         this.wasPressed = false;  // Track state change
 
@@ -76,8 +80,8 @@ const levelFlags = {
 // =============================================================================
 
 // Create a pressure plate and register it
-function createPressurePlate(gridRow, gridCol) {
-    const plate = new PressurePlate(gridRow, gridCol);
+function createPressurePlate(gridRow, gridCol, channel = 0) {
+    const plate = new PressurePlate(gridRow, gridCol, channel);
     pressurePlates.push(plate);
     levelFlags.plateCount++;
     return plate;
@@ -86,6 +90,7 @@ function createPressurePlate(gridRow, gridCol) {
 // Clear all pressure plates (for level reset)
 function clearPressurePlates() {
     pressurePlates.length = 0;
+    activeChannels.clear();
     levelFlags.plateCount = 0;
     levelFlags.pressedCount = 0;
     levelFlags.allPlatesPressed = false;
@@ -94,11 +99,26 @@ function clearPressurePlates() {
 // Update all pressure plates and level flags
 function updatePressurePlates() {
     let pressedCount = 0;
+    const previousChannels = new Set(activeChannels);
+    activeChannels.clear();
 
     for (const plate of pressurePlates) {
         plate.update();
         if (plate.isPressed) {
             pressedCount++;
+            activeChannels.add(plate.channel);
+        }
+    }
+
+    // Debug logging for channel changes
+    for (const ch of activeChannels) {
+        if (!previousChannels.has(ch)) {
+            console.log(`Channel ${ch} ACTIVATED`);
+        }
+    }
+    for (const ch of previousChannels) {
+        if (!activeChannels.has(ch)) {
+            console.log(`Channel ${ch} DEACTIVATED`);
         }
     }
 
@@ -124,4 +144,14 @@ function isPlatePressed(gridRow, gridCol) {
         }
     }
     return false;
+}
+
+// Check if a specific channel is active (at least one plate on channel is pressed)
+function isChannelActive(channel) {
+    return activeChannels.has(channel);
+}
+
+// Get all currently active channels
+function getActiveChannels() {
+    return Array.from(activeChannels);
 }

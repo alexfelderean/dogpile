@@ -1,0 +1,25 @@
+{
+  "name": "dogpile",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "esbuild src/main.js --bundle --minify --sourcemap --outfile=dist/bundle.js",
+    "dev": "esbuild src/main.js --bundle --sourcemap --outfile=dist/bundle.js --watch",
+    "buildnomap": "esbuild src/main.js --bundle --minify --outfile=dist/bundle.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexfelderean/dogpile.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/alexfelderean/dogpile/issues"
+  },
+  "homepage": "https://github.com/alexfelderean/dogpile#readme",
+  "description": "",
+  "devDependencies": {
+    "esbuild": "^0.27.3"
+  }
+}
