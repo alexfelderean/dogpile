@@ -1,5 +1,6 @@
 import { isPlayerOnGhost } from './ghost.js';
 import { playBark } from './audio.js';
+import { toggleMusic } from './audio.js';
 
 export const player = {
     position: [0, 0, 0], speed: 0.12, velocityY: 0, isJumping: false,
@@ -42,6 +43,7 @@ export function setupPlayerInput(canvas, onFirstInput) {
     document.addEventListener('keydown', (e) => {
         keys[e.code] = true;
         if (['KeyW', 'KeyS', 'KeyA', 'KeyD', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+        if (e.code === 'KeyM') toggleMusic(); // M key toggles music
         if (gameActive && onFirstInput) onFirstInput();
     });
     document.addEventListener('keyup', (e) => { keys[e.code] = false; });
