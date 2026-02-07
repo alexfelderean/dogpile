@@ -10,8 +10,8 @@ const player = {
     sensitivity: 0.002
 };
 
-// Room bounds for collision
-const ROOM_HALF_SIZE = 4.5;
+// Room bounds for collision (9x9 grid = 9 units wide, half = 4.5, with margin)
+const ROOM_HALF_SIZE = 4.2;
 const PLAYER_RADIUS = 0.3;
 
 // Input state
