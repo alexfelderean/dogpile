@@ -97,9 +97,8 @@ async function loadLevel(levelPath) {
         };
 
         // Set player spawn (using global function from player.js)
-        if (typeof setPlayerSpawn === 'function') {
-            setPlayerSpawn(spawnX, 0, spawnZ);
-        }
+        setPlayerSpawn(spawnX, 0, spawnZ);
+        resetPlayer();
 
         // Store raw buffer as currentLevel (or wrapper)
         currentLevel = { grid: levelGrid, door: doorConfig };
