@@ -36,6 +36,7 @@ const fsSource = `
   uniform vec3 uLightColor;
   uniform sampler2D uTexture;
   uniform bool uUseTexture;
+  uniform float u_globalAlpha;
   
   void main() {
     // Normalize interpolated normal
@@ -53,7 +54,7 @@ const fsSource = `
     
     vec3 finalColor = ambient + diffuse;
     
-    gl_FragColor = vec4(finalColor, baseColor.a);
+    gl_FragColor = vec4(finalColor, baseColor.a * u_globalAlpha);
   }
 `;
 
@@ -86,6 +87,12 @@ async function main() {
     // Initialize sky shader
     initSkyShader(gl);
 
+    // Initialize wall shader
+    initWallShader(gl);
+
+    // Initialize floor shader
+    initFloorShader(gl);
+
     // Compile shaders
     function compileShader(type, source) {
         const shader = gl.createShader(type);
@@ -114,12 +121,20 @@ async function main() {
     // Create geometry (level must be loaded first)
     let room = createRoomGeometry();
     let arrow = createArrowGeometry();
+    let wallGeom = createWallGeometry();
     const ghostGeom = createGhostGeometry();
     const playerGeom = createPlayerGeometry();
 
     // Track room index count (can change per level)
     let indexCount = room.indexCount;
     let arrowIndexCount = arrow.indexCount;
+
+    // Update wall buffers
+    updateWallBuffers(gl, wallGeom);
+
+    // Create and update floor buffers
+    let floorGeom = createFloorGeometry();
+    updateFloorBuffers(gl, floorGeom);
 
     // Room buffers
     const posBuf = gl.createBuffer();
@@ -144,6 +159,7 @@ async function main() {
     function updateRoomBuffers() {
         room = createRoomGeometry();
         arrow = createArrowGeometry();
+        wallGeom = createWallGeometry();
         indexCount = room.indexCount;
         arrowIndexCount = arrow.indexCount;
 
@@ -171,6 +187,13 @@ async function main() {
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, arrowIdxBuf);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, arrow.indices, gl.STATIC_DRAW);
+
+        // Update wall buffers
+        updateWallBuffers(gl, wallGeom);
+
+        // Update floor buffers
+        floorGeom = createFloorGeometry();
+        updateFloorBuffers(gl, floorGeom);
 
         // Reset transition to animate up from below
         levelTransitionY = -40;
@@ -304,6 +327,7 @@ async function main() {
     const uLightColor = gl.getUniformLocation(program, 'uLightColor');
     const uTexture = gl.getUniformLocation(program, 'uTexture');
     const uUseTexture = gl.getUniformLocation(program, 'uUseTexture');
+    const u_globalAlpha = gl.getUniformLocation(program, 'u_globalAlpha');
 
     // Identity matrix for room
     const identityMatrix = new Float32Array(16);
@@ -329,6 +353,7 @@ async function main() {
     gl.uniform3f(uLightDir, lightDirX / lightLen, lightDirY / lightLen, lightDirZ / lightLen);
     gl.uniform3f(uAmbientColor, 0.5, 0.5, 0.55);  // Brighter ambient
     gl.uniform3f(uLightColor, 0.6, 0.58, 0.5);   // Warm directional light
+    gl.uniform1f(u_globalAlpha, 1.0);  // Default to fully opaque
 
     // indexCount is defined above and updated when level changes
     const ghostIndexCount = ghostGeom.indexCount;
@@ -449,6 +474,14 @@ async function main() {
         // Render sky background first
         renderSky(gl, timestamp, canvas.width, canvas.height);
 
+        // Render brick walls
+        mat4Identity(roomModelMatrix);
+        roomModelMatrix[13] = levelTransitionY; // Apply Y translation for level transition
+        renderWalls(gl, roomModelMatrix, _viewMatrix, _projMatrix);
+
+        // Render grass floor
+        renderFloor(gl, roomModelMatrix, _viewMatrix, _projMatrix, timestamp / 1000.0);
+
         // Switch back to main shader program
         gl.useProgram(program);
 
@@ -460,6 +493,9 @@ async function main() {
         // Isometric view matrix (fixed camera angle)
         mat4IsometricView(_viewMatrix);
         gl.uniformMatrix4fv(uViewMatrix, false, _viewMatrix);
+
+        // Reset global alpha to fully opaque for room/arrows
+        gl.uniform1f(u_globalAlpha, 1.0);
 
         // Draw room (moved by transition)
         mat4Identity(roomModelMatrix);
@@ -496,7 +532,8 @@ async function main() {
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-        // Draw player (textured)
+        // Draw player (textured) - always fully visible
+        gl.uniform1f(u_globalAlpha, 1.0);
         const playerPos = getPlayerPosition();
         gl.bindBuffer(gl.ARRAY_BUFFER, playerPosBuf);
         gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
@@ -541,6 +578,8 @@ async function main() {
             gl.bindTexture(gl.TEXTURE_2D, playerTexture);
             gl.uniform1i(uTexture, 0);
             gl.uniform1i(uUseTexture, 1);
+            // Set ghost opacity (fades in from invisible to fully visible)
+            gl.uniform1f(u_globalAlpha, getGhostOpacity(timestamp));
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ghostIdxBuf);
 
             for (const ghost of ghostList) {

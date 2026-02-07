@@ -449,3 +449,22 @@ function getGhostModelMatrixForFrame(frame) {
     getGhostModelMatrix(_ghostModelMatrix, frame.x, frame.y, frame.z, frame.yaw);
     return _ghostModelMatrix;
 }
+
+// Get ghost opacity based on time loop state
+// Returns 0.3 when waiting for input, fades to 1 during collision delay, 1 after interactable
+function getGhostOpacity(timestamp) {
+    const MIN_OPACITY = 0.3;
+
+    // Semi-transparent when waiting for player to start moving
+    if (timeLoop.waitingForInput) {
+        return MIN_OPACITY;
+    }
+
+    // Calculate how far through the collision delay we are
+    const elapsed = timestamp - timeLoop.collisionStartTime;
+    const delayMs = timeLoop.collisionDelayTime * 1000;
+
+    // Fade from MIN_OPACITY to 1 during the collision delay period
+    const t = Math.min(1, elapsed / delayMs);
+    return MIN_OPACITY + (1 - MIN_OPACITY) * t;
+}
