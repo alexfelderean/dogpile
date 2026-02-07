@@ -7,7 +7,7 @@ import { loadLevel, createRoomGeometry, createArrowGeometry, createWallGeometry,
 import { initFloorShader, createFloorGeometry, updateFloorBuffers, renderFloor } from './floor.js';
 import { initWallShader, updateWallBuffers, renderWalls } from './wall.js';
 import { initSkyShader, renderSky } from './sky.js';
-import { toggleMusic } from './audio.js';
+import { startMusic } from './audio.js';
 
 const vsSource = `attribute vec4 aPosition;attribute vec3 aNormal;attribute vec4 aColor;attribute vec2 aTexCoord;uniform mat4 uModelMatrix;uniform mat4 uViewMatrix;uniform mat4 uProjectionMatrix;varying lowp vec4 vColor;varying highp vec3 vNormal;varying highp vec3 vWorldPos;varying highp vec2 vTexCoord;void main(){vec4 worldPos=uModelMatrix*aPosition;gl_Position=uProjectionMatrix*uViewMatrix*worldPos;vColor=aColor;vTexCoord=aTexCoord;vNormal=mat3(uModelMatrix)*aNormal;vWorldPos=worldPos.xyz;}`;
 
@@ -682,6 +682,7 @@ async function main() {
         requestAnimationFrame(render);
     }
     setTimeLoopRunning(true);
+    startMusic();
     render(performance.now());
 }
 main();
