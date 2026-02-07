@@ -149,6 +149,45 @@ function updateGhosts() {
     }
 }
 
+// --- Ghost Collision ---
+const GHOST_RADIUS = 0.35;  // Collision radius for ghosts
+const PLAYER_RADIUS = 0.3; // Collision radius for player
+
+function handleGhostCollisions() {
+    for (const ghost of ghosts) {
+        if (ghost.currentFrame > 0 && ghost.currentFrame <= ghost.frames.length) {
+            const frame = ghost.frames[ghost.currentFrame - 1];
+            
+            // Calculate distance between player and ghost (XZ plane only)
+            const dx = camera.position[0] - frame.x;
+            const dz = camera.position[2] - frame.z;
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            
+            const minDist = GHOST_RADIUS + PLAYER_RADIUS;
+            
+            if (dist < minDist && dist > 0.001) {
+                // Push player away from ghost
+                const overlap = minDist - dist;
+                const pushX = (dx / dist) * overlap;
+                const pushZ = (dz / dist) * overlap;
+                
+                camera.position[0] += pushX;
+                camera.position[2] += pushZ;
+            } else if (dist <= 0.001) {
+                // Player exactly on ghost, push in a default direction
+                camera.position[0] += minDist;
+            }
+        }
+    }
+    
+    // Re-clamp to room bounds after collision push
+    const roomHalfSize = 4.5;
+    if (camera.position[0] > roomHalfSize) camera.position[0] = roomHalfSize;
+    else if (camera.position[0] < -roomHalfSize) camera.position[0] = -roomHalfSize;
+    if (camera.position[2] > roomHalfSize) camera.position[2] = roomHalfSize;
+    else if (camera.position[2] < -roomHalfSize) camera.position[2] = -roomHalfSize;
+}
+
 function updateTimerUI(elapsed) {
     const timerFill = document.getElementById('timer-fill');
     const remaining = Math.max(0, 1 - elapsed / timeLoop.duration);
@@ -576,9 +615,6 @@ function main() {
             const elapsed = (timestamp - timeLoop.startTime) / 1000;
             updateTimerUI(elapsed);
             
-            // Record current frame
-            recordFrame(timestamp);
-            
             // Update ghost playback
             updateGhosts();
             
@@ -590,6 +626,16 @@ function main() {
 
         // Update camera based on input
         updateCamera();
+        
+        // Handle ghost collisions (ghosts push player)
+        if (timeLoop.isRunning) {
+            handleGhostCollisions();
+        }
+        
+        // Record current frame (after collision resolution)
+        if (timeLoop.isRunning) {
+            recordFrame(timestamp);
+        }
 
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
