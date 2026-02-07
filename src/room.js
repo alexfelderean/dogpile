@@ -210,7 +210,7 @@ function gridToWorldCollision(row, col) {
 
 // Handle player collision with level tiles (cubes)
 function handleLevelTileCollisions() {
-    if (!levelLoaded || !levelGrid) return;
+    if (!levelGrid) return;
 
     const cubeSize = CELL_SIZE;  // 2 units
     const cubeHeight = CELL_SIZE;  // 2 units

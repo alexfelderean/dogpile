@@ -1,7 +1,10 @@
 import sys
 
 # Custom Level Parser
-# Format: NN L NN L ...
+# Format: 
+# 0/1 = 0 = door leftside, 1 = door rightside
+# then first NN is spawn point index
+# then infinite NN L ... repeat as needed
 # NN = 2-digit Index (Decimal, 00-81)
 # L  = 1-char Type (Hex, a, b, c...)
 # Example: 00a13b -> Index 0, Type A; Index 13, Type B
