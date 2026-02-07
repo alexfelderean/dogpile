@@ -8,8 +8,32 @@ const player = {
     velocityY: 0,
     isJumping: false,
     jumpForce: 0.25,
-    gravity: 0.015
+    gravity: 0.015,
+    yaw: 0,        // Current visual yaw (smoothly interpolated)
+    targetYaw: 0   // Target yaw (snaps to cardinal directions)
 };
+
+// Cardinal direction yaw values (in radians)
+const DIR_POS_Z = 0;              // Facing +Z (toward camera in isometric)
+const DIR_POS_X = -Math.PI / 2;   // Facing +X (right in isometric)
+const DIR_NEG_Z = Math.PI;        // Facing -Z (away from camera)
+const DIR_NEG_X = Math.PI / 2;    // Facing -X (left in isometric)
+
+// Rotation interpolation speed (higher = faster rotation)
+const ROTATION_LERP_SPEED = 0.25;
+
+// Normalize angle to [-PI, PI] range
+function normalizeAngle(angle) {
+    while (angle > Math.PI) angle -= 2 * Math.PI;
+    while (angle < -Math.PI) angle += 2 * Math.PI;
+    return angle;
+}
+
+// Lerp angle taking the shortest path
+function lerpAngle(from, to, t) {
+    let diff = normalizeAngle(to - from);
+    return from + diff * t;
+}
 
 // Room bounds for collision (9x9 grid * 2 cell size = 18 units wide, half = 9, with margin)
 const ROOM_HALF_SIZE = 8.7;
@@ -53,6 +77,11 @@ function resetPlayer() {
 // Get player position for rendering
 function getPlayerPosition() {
     return player.position;
+}
+
+// Get player yaw for rendering
+function getPlayerYaw() {
+    return player.yaw;
 }
 
 // Setup keyboard and mouse input
@@ -229,7 +258,23 @@ function updatePlayer() {
         // Apply movement
         player.position[0] += moveX * speed;
         player.position[2] += moveZ * speed;
+
+        // Update facing direction based on dominant movement axis
+        const absMoveX = Math.abs(moveX);
+        const absMoveZ = Math.abs(moveZ);
+
+        if (absMoveX > absMoveZ) {
+            // Moving more in X direction
+            player.targetYaw = moveX > 0 ? DIR_POS_X : DIR_NEG_X;
+        } else if (absMoveZ > absMoveX) {
+            // Moving more in Z direction
+            player.targetYaw = moveZ > 0 ? DIR_POS_Z : DIR_NEG_Z;
+        }
+        // If equal, keep current target facing direction
     }
+
+    // Smoothly interpolate yaw toward target yaw
+    player.yaw = lerpAngle(player.yaw, player.targetYaw, ROTATION_LERP_SPEED);
 
     // Handle jumping (always check, regardless of movement)
     if ((keys['Space'] || jumpButton.pressed) && !player.isJumping) {
@@ -271,7 +316,7 @@ function getPlayerState() {
         x: player.position[0],
         y: player.position[1],
         z: player.position[2],
-        yaw: 0,   // No rotation in isometric
+        yaw: player.yaw,   // Current facing direction
         pitch: 0
     };
 }

@@ -525,33 +525,17 @@ function createRoomGeometry() {
     }
 
     // --- FLOOR ---
-    addQuad(
-        [-roomHalf, 0, -roomHalf],
-        [roomHalf, 0, -roomHalf],
-        [roomHalf, 0, roomHalf],
-        [-roomHalf, 0, roomHalf],
-        [0.5, 0.5, 0.54, 1.0]
-    );
+    // --- FLOOR ---
+    // Floor is now rendered by src/floor.js with grass shader
+    // addQuad(
+    //     [-roomHalf, 0, -roomHalf],
+    //     [roomHalf, 0, -roomHalf],
+    //     [roomHalf, 0, roomHalf],
+    //     [-roomHalf, 0, roomHalf],
+    //     [0.5, 0.5, 0.54, 1.0]
+    // );
 
-    // --- WALLS ---
-    const wallColor = [0.55, 0.57, 0.62, 1.0];
-
-    // Back wall (Z-)
-    addQuad(
-        [-roomHalf, 0, -roomHalf],
-        [-roomHalf, ROOM_HEIGHT, -roomHalf],
-        [roomHalf, ROOM_HEIGHT, -roomHalf],
-        [roomHalf, 0, -roomHalf],
-        wallColor
-    );
-    // Right wall (X+)
-    addQuad(
-        [roomHalf, 0, -roomHalf],
-        [roomHalf, ROOM_HEIGHT, -roomHalf],
-        [roomHalf, ROOM_HEIGHT, roomHalf],
-        [roomHalf, 0, roomHalf],
-        wallColor
-    );
+    // NOTE: Walls are now rendered separately with brick shader (see createWallGeometry)
 
     // --- DOOR (rendered on top of wall) ---
     if (doorConfig && doorConfig.wall) {
@@ -650,7 +634,24 @@ function createRoomGeometry() {
             // Render height-based terrain
             if (height > 0) {
                 const terrainColor = [0.45, 0.47, 0.52, 1.0];
-                addBox(worldX - cubeSize / 2, 0, worldZ - cubeSize / 2, cubeSize, floorY, cubeSize, terrainColor);
+                // Draw only sides, top is handled by floor shader
+                const x = worldX - cubeSize / 2;
+                const z = worldZ - cubeSize / 2;
+                const w = cubeSize;
+                const d = cubeSize;
+                const h = floorY;
+
+                // Add sides (Manually adding quads for sides instead of full box)
+                // Front
+                addQuad([x, 0, z + d], [x + w, 0, z + d], [x + w, h, z + d], [x, h, z + d], terrainColor);
+                // Back
+                addQuad([x + w, 0, z], [x, 0, z], [x, h, z], [x + w, h, z], terrainColor);
+                // Left
+                addQuad([x, 0, z], [x, 0, z + d], [x, h, z + d], [x, h, z], terrainColor);
+                // Right
+                addQuad([x + w, 0, z + d], [x + w, 0, z], [x + w, h, z], [x + w, h, z + d], terrainColor);
+
+                // Top face removed - handled by floor.js
             }
 
             if (objectType === 2) { // pressure plate
@@ -776,3 +777,62 @@ function createArrowGeometry() {
         indexCount: indices.length
     };
 }
+
+// =============================================================================
+// WALL GEOMETRY (for brick shader)
+// =============================================================================
+function createWallGeometry() {
+    const roomHalf = getLevelRoomHalf();
+
+    const positions = [];
+    const texCoords = [];
+    const indices = [];
+    let vertexOffset = 0;
+
+    // Helper to add a wall quad with UVs
+    function addWallQuad(p1, p2, p3, p4, u1, v1, u2, v2) {
+        // Positions (4 vertices for a quad)
+        positions.push(...p1, ...p2, ...p3, ...p4);
+
+        // UV coordinates (map to 0-1 range for shader)
+        texCoords.push(
+            u1, v1,  // bottom-left
+            u1, v2,  // top-left
+            u2, v2,  // top-right
+            u2, v1   // bottom-right
+        );
+
+        // Indices for two triangles
+        indices.push(
+            vertexOffset, vertexOffset + 1, vertexOffset + 2,
+            vertexOffset, vertexOffset + 2, vertexOffset + 3
+        );
+        vertexOffset += 4;
+    }
+
+    // Back wall (Z-) - facing +Z
+    addWallQuad(
+        [-roomHalf, 0, -roomHalf],
+        [-roomHalf, ROOM_HEIGHT, -roomHalf],
+        [roomHalf, ROOM_HEIGHT, -roomHalf],
+        [roomHalf, 0, -roomHalf],
+        0, 0, 1, 1  // Full UV range
+    );
+
+    // Right wall (X+) - facing -X
+    addWallQuad(
+        [roomHalf, 0, -roomHalf],
+        [roomHalf, ROOM_HEIGHT, -roomHalf],
+        [roomHalf, ROOM_HEIGHT, roomHalf],
+        [roomHalf, 0, roomHalf],
+        0, 0, 1, 1  // Full UV range
+    );
+
+    return {
+        positions: new Float32Array(positions),
+        texCoords: new Float32Array(texCoords),
+        indices: new Uint16Array(indices),
+        indexCount: indices.length
+    };
+}
+
