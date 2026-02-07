@@ -100,11 +100,13 @@ async function main() {
 
     // Create geometry (level must be loaded first)
     let room = createRoomGeometry();
+    let arrow = createArrowGeometry();
     const ghostGeom = createGhostGeometry();
     const playerGeom = createPlayerGeometry();
 
     // Track room index count (can change per level)
     let indexCount = room.indexCount;
+    let arrowIndexCount = arrow.indexCount;
 
     // Room buffers
     const posBuf = gl.createBuffer();
@@ -128,7 +130,9 @@ async function main() {
     // Function to update room buffers (called when level changes)
     function updateRoomBuffers() {
         room = createRoomGeometry();
+        arrow = createArrowGeometry();
         indexCount = room.indexCount;
+        arrowIndexCount = arrow.indexCount;
 
         gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
         gl.bufferData(gl.ARRAY_BUFFER, room.positions, gl.STATIC_DRAW);
@@ -138,6 +142,19 @@ async function main() {
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, room.indices, gl.STATIC_DRAW);
+
+        // Update arrow buffers
+        gl.bindBuffer(gl.ARRAY_BUFFER, arrowPosBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, arrow.positions, gl.STATIC_DRAW);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, arrowColBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, arrow.colors, gl.STATIC_DRAW);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, arrowNormBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, arrow.normals, gl.STATIC_DRAW);
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, arrowIdxBuf);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, arrow.indices, gl.STATIC_DRAW);
 
         // Reset transition to animate up from below
         levelTransitionY = -40;
@@ -164,6 +181,23 @@ async function main() {
     const normBuf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, normBuf);
     gl.bufferData(gl.ARRAY_BUFFER, room.normals, gl.STATIC_DRAW);
+
+    // Arrow buffers (separate for bobbing animation)
+    const arrowPosBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, arrowPosBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, arrow.positions, gl.STATIC_DRAW);
+
+    const arrowColBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, arrowColBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, arrow.colors, gl.STATIC_DRAW);
+
+    const arrowNormBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, arrowNormBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, arrow.normals, gl.STATIC_DRAW);
+
+    const arrowIdxBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, arrowIdxBuf);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, arrow.indices, gl.STATIC_DRAW);
 
     // Ghost buffers
     const ghostPosBuf = gl.createBuffer();
@@ -361,6 +395,23 @@ async function main() {
         gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
         gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, 0);
+
+        // Draw arrows with bobbing animation
+        if (arrowIndexCount > 0) {
+            const bobOffset = Math.sin(timestamp * 0.003) * 0.3;
+            mat4Identity(roomModelMatrix);
+            roomModelMatrix[13] = levelTransitionY + bobOffset;
+            gl.uniformMatrix4fv(uModelMatrix, false, roomModelMatrix);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, arrowPosBuf);
+            gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, arrowNormBuf);
+            gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, arrowColBuf);
+            gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, arrowIdxBuf);
+            gl.drawElements(gl.TRIANGLES, arrowIndexCount, gl.UNSIGNED_SHORT, 0);
+        }
 
         // Enable blending for semi-transparent characters
         gl.enable(gl.BLEND);

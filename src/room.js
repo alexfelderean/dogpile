@@ -434,8 +434,8 @@ function createRoomGeometry() {
 
     // Arrow helper
     function addArrow(cx, cz, color) {
-        const size = CELL_SIZE * 0.6;
-        const floatHeight = 1.5;
+        const size = 1.5 * CELL_SIZE;
+        const floatHeight = 2.0;
         const headLength = size * 0.4;
         const headWidth = size * 0.5;
         const tailWidth = size * 0.15;
@@ -489,8 +489,9 @@ function createRoomGeometry() {
             const [worldX, worldZ] = gridToWorld(row, col);
             const color = OBJECT_COLORS[objectType] || [0.5, 0.5, 0.5, 1.0];
 
-            if (objectType === 1) { // arrow
-                addArrow(worldX, worldZ, color);
+            if (objectType === 1) { // arrow - skip, rendered separately for animation
+                // Arrows are created by createArrowGeometry()
+                continue;
             } else if (objectType === 2) { // pressure plate
                 createPressurePlate(row, col);
                 const plateSize = CELL_SIZE * 0.7;
@@ -498,6 +499,86 @@ function createRoomGeometry() {
             } else { // cube
                 addBox(worldX - cubeSize / 2, 0, worldZ - cubeSize / 2, cubeSize, cubeHeight, cubeSize, color);
             }
+        }
+    }
+
+    return {
+        positions: new Float32Array(positions),
+        colors: new Float32Array(colors),
+        normals: new Float32Array(normals),
+        indices: new Uint16Array(indices),
+        indexCount: indices.length
+    };
+}
+
+// Create arrow geometry separately for animation
+function createArrowGeometry() {
+    const positions = [];
+    const colors = [];
+    const normals = [];
+    const indices = [];
+    let vertexOffset = 0;
+
+    const size = 1.5 * CELL_SIZE;
+    const floatHeight = 2.0;
+    const headLength = size * 0.4;
+    const headWidth = size * 0.5;
+    const tailWidth = size * 0.15;
+    const tailLength = size * 0.5;
+
+    const tipY = floatHeight - size / 2;
+    const headBaseY = tipY + headLength;
+    const tailTopY = headBaseY + tailLength;
+
+    const cos45 = 0.7071, sin45 = 0.7071;
+    function rot(dx, dz) {
+        return [dx * cos45 - dz * sin45, dx * sin45 + dz * cos45];
+    }
+
+    const [hx1, hz1] = rot(-headWidth / 2, 0);
+    const [hx2, hz2] = rot(headWidth / 2, 0);
+    const [tx1, tz1] = rot(-tailWidth / 2, 0);
+    const [tx2, tz2] = rot(tailWidth / 2, 0);
+
+    const arrowColor = OBJECT_COLORS[1] || [0.9, 0.2, 0.2, 1.0];
+
+    // Convert grid position to world position (centered at origin)
+    function gridToWorld(row, col) {
+        return [
+            (col - GRID_SIZE / 2 + 0.5) * CELL_SIZE,
+            (row - GRID_SIZE / 2 + 0.5) * CELL_SIZE
+        ];
+    }
+
+    // Iterate through grid to find arrows
+    for (let row = 0; row < GRID_SIZE; row++) {
+        for (let col = 0; col < GRID_SIZE; col++) {
+            const objectType = levelGrid[row] ? levelGrid[row][col] : 0;
+            if (objectType !== 1) continue;
+
+            const [cx, cz] = gridToWorld(row, col);
+
+            // Arrow head (triangle)
+            positions.push(cx, tipY, cz, cx + hx1, headBaseY, cz + hz1, cx + hx2, headBaseY, cz + hz2);
+            for (let i = 0; i < 3; i++) colors.push(...arrowColor);
+            normals.push(0.7071, 0, 0.7071, 0.7071, 0, 0.7071, 0.7071, 0, 0.7071);
+            indices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2);
+            vertexOffset += 3;
+
+            // Arrow tail (quad)
+            positions.push(
+                cx + tx1, headBaseY, cz + tz1,
+                cx + tx2, headBaseY, cz + tz2,
+                cx + tx2, tailTopY, cz + tz2,
+                cx + tx1, tailTopY, cz + tz1
+            );
+            for (let i = 0; i < 4; i++) colors.push(...arrowColor);
+            for (let i = 0; i < 4; i++) normals.push(0.7071, 0, 0.7071);
+            indices.push(
+                vertexOffset, vertexOffset + 1, vertexOffset + 2,
+                vertexOffset, vertexOffset + 2, vertexOffset + 3
+            );
+            vertexOffset += 4;
         }
     }
 

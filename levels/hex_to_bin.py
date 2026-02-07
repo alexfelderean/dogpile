@@ -7,7 +7,7 @@ import sys
 # then infinite NN L ... repeat as needed
 # NN = 2-digit Index (Decimal, 00-81)
 # L  = 1-char Type (Hex, a, b, c...)
-# Example call: python3 hex_to_bin.py 07200a08b80c > l1
+# Example call: python3 hex_to_bin.py 17200a08b80c > l1
 
 def main():
     if len(sys.argv) < 2:
