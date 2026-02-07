@@ -2,7 +2,8 @@
 // GHOST ABILITY SYSTEM
 // =============================================================================
 const MAX_GHOSTS = 8;
-const GHOST_RADIUS = 0.35;
+const GHOST_RADIUS = 0.7;
+const GHOST_PLAYER_RADIUS = 0.7;  // Player's collision radius for ghost collisions
 
 // Ghost state
 const ghosts = [];
@@ -98,10 +99,10 @@ function updateGhosts(elapsedTime) {
         if (ghost.frames.length === 0) continue;
 
         // Find the frame just before current time
-        let idx = ghost.currentFrame;  
+        let idx = ghost.currentFrame;
         // Ensure index is valid and reset if needed
         if (idx >= ghost.frames.length - 1) idx = 0;
-        
+
         // Search forward
         while (idx < ghost.frames.length - 1 && ghost.frames[idx + 1].time <= elapsedTime) {
             idx++;
@@ -136,6 +137,8 @@ function getGhostFrame(ghost) {
 }
 
 // --- Ghost Collisions ---
+const GHOST_HEIGHT = 1.4;  // Height of ghost cube
+
 function handleGhostCollisions(timestamp) {
     if (timestamp - timeLoop.collisionStartTime < timeLoop.collisionDelayTime * 1000) {
         return;
@@ -146,17 +149,37 @@ function handleGhostCollisions(timestamp) {
         if (!frame) continue;
 
         const dx = player.position[0] - frame.x;
+        const dy = player.position[1] - frame.y;  // Vertical difference
         const dz = player.position[2] - frame.z;
-        const dist = Math.sqrt(dx * dx + dz * dz);
+        const horizontalDist = Math.sqrt(dx * dx + dz * dz);
 
-        const minDist = GHOST_RADIUS + PLAYER_RADIUS;
+        const minHorizontalDist = GHOST_RADIUS + GHOST_PLAYER_RADIUS;
 
-        if (dist < minDist && dist > 0.001) {
-            const overlap = minDist - dist;
-            player.position[0] += (dx / dist) * overlap;
-            player.position[2] += (dz / dist) * overlap;
-        } else if (dist <= 0.001) {
-            player.position[0] += minDist;
+        // Check if player is above the ghost (landing on top)
+        const ghostTopY = frame.y + GHOST_HEIGHT;
+        const playerBottomY = player.position[1];
+
+        // If player is within horizontal bounds of the ghost
+        if (horizontalDist < minHorizontalDist * 0.9) {
+            // Check if player is falling onto the ghost from above
+            if (playerBottomY >= ghostTopY - 0.3 && playerBottomY <= ghostTopY + 0.5 && player.velocityY <= 0) {
+                // Land on top of ghost
+                player.position[1] = ghostTopY;
+                player.velocityY = 0;
+                player.isJumping = false;
+                continue;  // Skip horizontal collision for this ghost
+            }
+        }
+
+        // Horizontal collision (only if not on top)
+        if (playerBottomY < ghostTopY - 0.1) {
+            if (horizontalDist < minHorizontalDist && horizontalDist > 0.001) {
+                const overlap = minHorizontalDist - horizontalDist;
+                player.position[0] += (dx / horizontalDist) * overlap;
+                player.position[2] += (dz / horizontalDist) * overlap;
+            } else if (horizontalDist <= 0.001) {
+                player.position[0] += minHorizontalDist;
+            }
         }
     }
 
@@ -234,19 +257,23 @@ function createGhostGeometry() {
         vertexOffset += 4;
     }
 
-    const w = 0.15, h = 0.8, d = 0.15;
+    // Cube dimensions matching pressure plates (1.4x1.4x1.4)
+    const size = 1.4;
+    const half = size / 2;
     const ghostColor = [0.4, 0.6, 0.9, 0.7];
 
     // Front (Z+)
-    addQuad([-w, 0, d], [w, 0, d], [w, h * 2, d], [-w, h * 2, d], ghostColor, [0, 0, 1]);
+    addQuad([-half, 0, half], [half, 0, half], [half, size, half], [-half, size, half], ghostColor, [0, 0, 1]);
     // Back (Z-)
-    addQuad([w, 0, -d], [-w, 0, -d], [-w, h * 2, -d], [w, h * 2, -d], ghostColor, [0, 0, -1]);
+    addQuad([half, 0, -half], [-half, 0, -half], [-half, size, -half], [half, size, -half], ghostColor, [0, 0, -1]);
     // Left (X-)
-    addQuad([-w, 0, -d], [-w, 0, d], [-w, h * 2, d], [-w, h * 2, -d], ghostColor, [-1, 0, 0]);
+    addQuad([-half, 0, -half], [-half, 0, half], [-half, size, half], [-half, size, -half], ghostColor, [-1, 0, 0]);
     // Right (X+)
-    addQuad([w, 0, d], [w, 0, -d], [w, h * 2, -d], [w, h * 2, d], ghostColor, [1, 0, 0]);
+    addQuad([half, 0, half], [half, 0, -half], [half, size, -half], [half, size, half], ghostColor, [1, 0, 0]);
     // Top (Y+)
-    addQuad([-w, h * 2, d], [w, h * 2, d], [w, h * 2, -d], [-w, h * 2, -d], ghostColor, [0, 1, 0]);
+    addQuad([-half, size, half], [half, size, half], [half, size, -half], [-half, size, -half], ghostColor, [0, 1, 0]);
+    // Bottom (Y-)
+    addQuad([-half, 0, -half], [half, 0, -half], [half, 0, half], [-half, 0, half], ghostColor, [0, -1, 0]);
 
     return {
         positions: new Float32Array(positions),
@@ -275,19 +302,23 @@ function createPlayerGeometry() {
         vertexOffset += 4;
     }
 
-    const w = 0.15, h = 0.8, d = 0.15;
+    // Cube dimensions matching pressure plates (1.4x1.4x1.4)
+    const size = 1.4;
+    const half = size / 2;
     const playerColor = [0.9, 0.9, 0.2, 1.0]; // Yellow/gold for player
 
     // Front (Z+)
-    addQuad([-w, 0, d], [w, 0, d], [w, h * 2, d], [-w, h * 2, d], playerColor, [0, 0, 1]);
+    addQuad([-half, 0, half], [half, 0, half], [half, size, half], [-half, size, half], playerColor, [0, 0, 1]);
     // Back (Z-)
-    addQuad([w, 0, -d], [-w, 0, -d], [-w, h * 2, -d], [w, h * 2, -d], playerColor, [0, 0, -1]);
+    addQuad([half, 0, -half], [-half, 0, -half], [-half, size, -half], [half, size, -half], playerColor, [0, 0, -1]);
     // Left (X-)
-    addQuad([-w, 0, -d], [-w, 0, d], [-w, h * 2, d], [-w, h * 2, -d], playerColor, [-1, 0, 0]);
+    addQuad([-half, 0, -half], [-half, 0, half], [-half, size, half], [-half, size, -half], playerColor, [-1, 0, 0]);
     // Right (X+)
-    addQuad([w, 0, d], [w, 0, -d], [w, h * 2, -d], [w, h * 2, d], playerColor, [1, 0, 0]);
+    addQuad([half, 0, half], [half, 0, -half], [half, size, -half], [half, size, half], playerColor, [1, 0, 0]);
     // Top (Y+)
-    addQuad([-w, h * 2, d], [w, h * 2, d], [w, h * 2, -d], [-w, h * 2, -d], playerColor, [0, 1, 0]);
+    addQuad([-half, size, half], [half, size, half], [half, size, -half], [-half, size, -half], playerColor, [0, 1, 0]);
+    // Bottom (Y-)
+    addQuad([-half, 0, -half], [half, 0, -half], [half, 0, half], [-half, 0, half], playerColor, [0, -1, 0]);
 
     return {
         positions: new Float32Array(positions),
