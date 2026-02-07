@@ -143,6 +143,9 @@ async function main() {
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, room.indices, gl.STATIC_DRAW);
 
+        gl.bindBuffer(gl.ARRAY_BUFFER, normBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, room.normals, gl.STATIC_DRAW);
+
         // Update arrow buffers
         gl.bindBuffer(gl.ARRAY_BUFFER, arrowPosBuf);
         gl.bufferData(gl.ARRAY_BUFFER, arrow.positions, gl.STATIC_DRAW);
