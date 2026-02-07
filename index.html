@@ -22,41 +22,7 @@
             height: 100vh;
         }
 
-        #overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            cursor: pointer;
-            z-index: 10;
-        }
 
-        #overlay h1 {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            text-shadow: 0 0 20px rgba(100, 200, 255, 0.8);
-        }
-
-        #overlay p {
-            font-size: 1.2rem;
-            opacity: 0.8;
-            margin-bottom: 2rem;
-        }
-
-        #overlay .instructions {
-            font-size: 0.9rem;
-            opacity: 0.6;
-            text-align: center;
-            line-height: 1.8;
-        }
 
         #timer-bar {
             position: fixed;
@@ -201,15 +167,7 @@
 </head>
 
 <body>
-    <div id="overlay">
-        <h1>Escape Room</h1>
-        <p>Click to start</p>
-        <div class="instructions">
-            WASD / Arrow Keys - Move<br>
-            Space - Jump<br>
-            Touch: Use joystick + button
-        </div>
-    </div>
+
     <div id="timer-bar" class="hidden">
         <div id="timer-fill"></div>
     </div>
@@ -221,7 +179,7 @@
             <div id="joystick-knob"></div>
         </div>
     </div>
-    
+
     <button id="jump-button" class="hidden">JUMP</button>
 
     <canvas id="glCanvas"></canvas>

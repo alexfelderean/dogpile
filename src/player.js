@@ -17,7 +17,7 @@ const PLAYER_RADIUS = 0.7;
 
 // Input state
 const keys = {};
-let gameActive = false;
+let gameActive = true;
 let isTouchMode = false;
 
 // Touch controls state
@@ -66,44 +66,17 @@ function setupPlayerInput(canvas, onFirstInput) {
     });
 
     // UI Elements
-    const overlay = document.getElementById('overlay');
     const timerBar = document.getElementById('timer-bar');
     const ghostCount = document.getElementById('ghost-count');
     const joystickZone = document.getElementById('joystick-zone');
     const joystickKnob = document.getElementById('joystick-knob');
     const jumpBtn = document.getElementById('jump-button');
 
-    // Handle game state visibility
-    function setGameActive(active) {
-        gameActive = active;
-        if (active) {
-            overlay.classList.add('hidden');
-            timerBar.classList.remove('hidden');
-            ghostCount.classList.remove('hidden');
-            joystickZone.classList.remove('hidden');
-            jumpBtn.classList.remove('hidden');
-        } else {
-            overlay.classList.remove('hidden');
-            timerBar.classList.add('hidden');
-            ghostCount.classList.add('hidden');
-            joystickZone.classList.add('hidden');
-            jumpBtn.classList.add('hidden');
-        }
-    }
-
-    // Click to start (no pointer lock needed for isometric)
-    overlay.addEventListener('click', () => {
-        setGameActive(true);
-        if (onFirstInput) onFirstInput();
-    });
-
-    // Touch Start on Overlay
-    overlay.addEventListener('touchstart', (e) => {
-        isTouchMode = true;
-        setGameActive(true);
-        if (onFirstInput) onFirstInput();
-        e.preventDefault();
-    }, { passive: false });
+    // Show UI immediately since game starts right away
+    timerBar.classList.remove('hidden');
+    ghostCount.classList.remove('hidden');
+    joystickZone.classList.remove('hidden');
+    jumpBtn.classList.remove('hidden');
 
     // -------------------------------------------------------------------------
     // TOUCH CONTROLS
