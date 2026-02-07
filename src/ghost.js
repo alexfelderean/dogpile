@@ -80,25 +80,59 @@ function recordFrame(timestamp) {
     if (!timeLoop.isRunning) return;
 
     if (timestamp - timeLoop.lastRecordTime >= timeLoop.recordInterval) {
-        currentRecording.push(getPlayerState());
+        const state = getPlayerState();
+        // Record precise time relative to loop start
+        state.time = (timestamp - timeLoop.startTime) / 1000;
+        currentRecording.push(state);
         timeLoop.lastRecordTime = timestamp;
     }
 }
 
 // --- Ghost Playback ---
-function updateGhosts() {
+function lerp(start, end, t) {
+    return start * (1 - t) + end * t;
+}
+
+function updateGhosts(elapsedTime) {
     for (const ghost of ghosts) {
-        if (ghost.currentFrame < ghost.frames.length) {
-            ghost.currentFrame++;
+        if (ghost.frames.length === 0) continue;
+
+        // Find the frame just before current time
+        let idx = ghost.currentFrame;  
+        // Ensure index is valid and reset if needed
+        if (idx >= ghost.frames.length - 1) idx = 0;
+        
+        // Search forward
+        while (idx < ghost.frames.length - 1 && ghost.frames[idx + 1].time <= elapsedTime) {
+            idx++;
+        }
+        ghost.currentFrame = idx;
+
+        // Interpolate between current frame and next frame
+        const frameA = ghost.frames[idx];
+        const frameB = ghost.frames[idx + 1];
+
+        if (frameB) {
+            const range = frameB.time - frameA.time;
+            const t = range > 0.0001 ? (elapsedTime - frameA.time) / range : 0;
+            const ct = Math.max(0, Math.min(1, t));
+
+            ghost.interpolatedFrame = {
+                x: lerp(frameA.x, frameB.x, ct),
+                y: lerp(frameA.y, frameB.y, ct),
+                z: lerp(frameA.z, frameB.z, ct),
+                yaw: lerp(frameA.yaw, frameB.yaw, ct),
+                pitch: lerp(frameA.pitch, frameB.pitch, ct),
+                time: elapsedTime
+            };
+        } else {
+            ghost.interpolatedFrame = frameA;
         }
     }
 }
 
 function getGhostFrame(ghost) {
-    if (ghost.currentFrame > 0 && ghost.currentFrame <= ghost.frames.length) {
-        return ghost.frames[ghost.currentFrame - 1];
-    }
-    return null;
+    return ghost.interpolatedFrame || (ghost.frames.length > 0 ? ghost.frames[0] : null);
 }
 
 // --- Ghost Collisions ---
@@ -165,7 +199,7 @@ function updateTimeLoop(timestamp) {
     } else {
         const elapsed = (timestamp - timeLoop.startTime) / 1000;
         updateTimerUI(elapsed);
-        updateGhosts();
+        updateGhosts(elapsed);
 
         if (elapsed >= timeLoop.duration) {
             resetTimeLoop();
