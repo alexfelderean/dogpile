@@ -132,14 +132,16 @@ function checkDoorCollision(playerX, playerZ) {
 
     const roomHalf = getLevelRoomHalf();
     const dw = doorConfig.width / 2;
-    const collisionDist = 0.5;
+    const playerHalf = 0.7;  // Player cube half-size
+    // Player stops at (roomHalf - margin - playerHalf), so check based on that
+    const playerMaxPos = 8.7 - playerHalf;  // 8.0
 
     if (doorConfig.wall === 'z-') {
-        const nearWall = playerZ < -roomHalf + collisionDist;
+        const nearWall = playerZ <= -playerMaxPos;
         const inDoorX = playerX > -dw && playerX < dw;
         return nearWall && inDoorX;
     } else if (doorConfig.wall === 'x+') {
-        const nearWall = playerX > roomHalf - collisionDist;
+        const nearWall = playerX >= playerMaxPos;
         const inDoorZ = playerZ > -dw && playerZ < dw;
         return nearWall && inDoorZ;
     }
