@@ -51,6 +51,12 @@ function resetTimeLoop() {
     // Reset ghost playback
     for (const ghost of ghosts) {
         ghost.currentFrame = 0;
+        // Reset interpolated position to first frame so ghost visually resets
+        if (ghost.frames.length > 0) {
+            ghost.interpolatedFrame = ghost.frames[0];
+        } else {
+            ghost.interpolatedFrame = null;
+        }
     }
 
     timeLoop.waitingForInput = true;
