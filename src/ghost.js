@@ -1,6 +1,7 @@
 import { player, resetPlayer, getPlayerState, clampPlayerToRoom } from './player.js';
+import { playBark } from './audio.js';
 
-const MAX_GHOSTS = 4;
+const MAX_GHOSTS = 3;
 const ghosts = [];
 let currentRecording = [];
 const timeLoop = {
@@ -63,6 +64,7 @@ function updateGhosts(elapsedTime) {
         ghost.currentFrame = idx;
         const frameA = ghost.frames[idx];
         const frameB = ghost.frames[idx + 1];
+        const prevY = ghost.interpolatedFrame ? ghost.interpolatedFrame.y : frameA.y;
         if (frameB) {
             const range = frameB.time - frameA.time;
             const t = range > 0.0001 ? (elapsedTime - frameA.time) / range : 0;
@@ -73,6 +75,15 @@ function updateGhosts(elapsedTime) {
                 pitch: lerp(frameA.pitch, frameB.pitch, ct), time: elapsedTime
             };
         } else ghost.interpolatedFrame = frameA;
+        // Detect jump: velocity changed from non-positive to positive
+        const newY = ghost.interpolatedFrame.y;
+        const prevVelocity = ghost.prevVelocity || 0;
+        const newVelocity = newY - prevY;
+        // Bark only when velocity transitions from <= 0 to > 0 (jump start)
+        if (prevVelocity <= 0 && newVelocity > 0.01) {
+            playBark();
+        }
+        ghost.prevVelocity = newVelocity;
     }
 }
 

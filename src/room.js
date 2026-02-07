@@ -254,7 +254,7 @@ export function createRoomGeometry() {
             }
             if (objectType === 2) {
                 const channel = entityByte & 0x0F;
-                createPressurePlate(row, col, channel);
+                createPressurePlate(row, col, channel, height);
                 const plateSize = CELL_SIZE * 0.7;
                 addBox(worldX - plateSize / 2, floorY + 0.01, worldZ - plateSize / 2, plateSize, 0.08, plateSize, color);
             } else if (objectType === 4) {
