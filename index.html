@@ -120,7 +120,8 @@
             height: 120px;
             z-index: 20;
             touch-action: none;
-            display: none; /* Hidden by default, shown via JS if touch */
+            display: none;
+            /* Hidden by default, shown via JS if touch */
         }
 
         #joystick-base {
@@ -149,11 +150,12 @@
             #joystick-zone {
                 display: block;
             }
+
             .instructions {
                 display: none;
             }
         }
-        
+
         body.touch-active #joystick-zone {
             display: block;
         }
@@ -177,7 +179,7 @@
         <div id="timer-fill"></div>
     </div>
     <div id="ghost-count" class="hidden">Ghosts: 0/8</div>
-    
+
     <!-- Touch Controls -->
     <div id="joystick-zone" class="hidden">
         <div id="joystick-base">

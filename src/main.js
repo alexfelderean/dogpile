@@ -161,12 +161,12 @@ function main() {
             lastWidth = canvas.width;
             lastHeight = canvas.height;
             gl.viewport(0, 0, lastWidth, lastHeight);
-            
+
             // Orthographic projection sized to fit the room
             const aspect = lastWidth / lastHeight;
             // Room is 18x18 units; diagonal ~25.5 units; need viewSize ~20 for full view with margin
             const viewSize = 20; // Half-size of visible area
-            mat4Orthographic(_projMatrix, 
+            mat4Orthographic(_projMatrix,
                 -viewSize * aspect, viewSize * aspect,  // left, right
                 -viewSize, viewSize,                     // bottom, top
                 0.1, 100.0);                             // near, far
