@@ -4,7 +4,11 @@
 // Camera/player state
 const player = {
     position: [0, 0, 0],  // Ground level
-    speed: 0.08
+    speed: 0.08,
+    velocityY: 0,
+    isJumping: false,
+    jumpForce: 0.25,
+    gravity: 0.015
 };
 
 // Room bounds for collision (9x9 grid * 2 cell size = 18 units wide, half = 9, with margin)
@@ -24,6 +28,11 @@ const joystick = {
     origin: { x: 0, y: 0 },
     current: { x: 0, y: 0 },
     radius: 50 // Max drag radius
+};
+
+const jumpButton = {
+    id: null,
+    pressed: false
 };
 
 // Reset player to starting position
@@ -62,6 +71,7 @@ function setupPlayerInput(canvas, onFirstInput) {
     const ghostCount = document.getElementById('ghost-count');
     const joystickZone = document.getElementById('joystick-zone');
     const joystickKnob = document.getElementById('joystick-knob');
+    const jumpBtn = document.getElementById('jump-button');
 
     // Handle game state visibility
     function setGameActive(active) {
@@ -71,11 +81,13 @@ function setupPlayerInput(canvas, onFirstInput) {
             timerBar.classList.remove('hidden');
             ghostCount.classList.remove('hidden');
             joystickZone.classList.remove('hidden');
+            jumpBtn.classList.remove('hidden');
         } else {
             overlay.classList.remove('hidden');
             timerBar.classList.add('hidden');
             ghostCount.classList.add('hidden');
             joystickZone.classList.add('hidden');
+            jumpBtn.classList.add('hidden');
         }
     }
 
@@ -117,6 +129,23 @@ function setupPlayerInput(canvas, onFirstInput) {
         // Move knob
         joystickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
     }
+
+    // Jump button touch handling
+    jumpBtn.addEventListener('touchstart', (e) => {
+        if (!gameActive) return;
+        e.preventDefault();
+        jumpButton.pressed = true;
+        jumpButton.id = e.changedTouches[0].identifier;
+        jumpBtn.classList.add('pressed');
+    }, { passive: false });
+
+    jumpBtn.addEventListener('touchend', (e) => {
+        if (!gameActive) return;
+        e.preventDefault();
+        jumpButton.pressed = false;
+        jumpButton.id = null;
+        jumpBtn.classList.remove('pressed');
+    }, { passive: false });
 
     canvas.addEventListener('touchstart', (e) => {
         if (!gameActive) return;
@@ -183,44 +212,59 @@ function setupPlayerInput(canvas, onFirstInput) {
 function hasPlayerInput() {
     return keys['KeyW'] || keys['KeyS'] || keys['KeyA'] || keys['KeyD'] ||
            keys['ArrowUp'] || keys['ArrowDown'] || keys['ArrowLeft'] || keys['ArrowRight'] ||
+           keys['Space'] || jumpButton.pressed ||
            Math.abs(joystick.vector.x) > 0.1 || Math.abs(joystick.vector.y) > 0.1;
 }
 
-// Update player position based on input (world-relative for isometric)
+// Update player position based on input (isometric-aligned movement)
 function updatePlayer() {
     if (!isPlayerActive()) return false;
 
     const speed = player.speed;
 
-    let moveX = 0;
-    let moveZ = 0;
+    let moveFwd = 0;  // Forward/back in screen space
+    let moveRight = 0; // Left/right in screen space
 
-    // Keyboard - world-relative movement
-    // In isometric view: W/Up = -Z (away), S/Down = +Z (toward)
-    //                    A/Left = -X (left), D/Right = +X (right)
-    if (keys['KeyW'] || keys['ArrowUp']) moveZ -= 1;
-    if (keys['KeyS'] || keys['ArrowDown']) moveZ += 1;
-    if (keys['KeyA'] || keys['ArrowLeft']) moveX -= 1;
-    if (keys['KeyD'] || keys['ArrowRight']) moveX += 1;
+    // Keyboard - isometric-aligned movement
+    // W = toward back corner, S = toward front corner
+    // A = toward left corner, D = toward right corner
+    if (keys['KeyW'] || keys['ArrowUp']) moveFwd += 1;
+    if (keys['KeyS'] || keys['ArrowDown']) moveFwd -= 1;
+    if (keys['KeyA'] || keys['ArrowLeft']) moveRight -= 1;
+    if (keys['KeyD'] || keys['ArrowRight']) moveRight += 1;
 
-    // Joystick - world-relative
-    // joystick.vector.x = left/right = X axis
-    // joystick.vector.y = up/down = Z axis (up screen = -Z)
-    moveX += joystick.vector.x;
-    moveZ += joystick.vector.y;
+    // Joystick - isometric-aligned
+    moveRight += joystick.vector.x;
+    moveFwd -= joystick.vector.y; // Invert Y for natural control
 
-    if (moveX === 0 && moveZ === 0) return false;
+    if (moveFwd === 0 && moveRight === 0) return false;
 
-    // Normalize diagonal movement
-    const len = Math.sqrt(moveX * moveX + moveZ * moveZ);
-    if (len > 1) {
-        moveX /= len;
-        moveZ /= len;
-    }
+    // Convert isometric screen space to world space (45-degree rotation)
+    // W (forward) should go toward back corner, S (back) toward front corner
+    // D (right) should go toward right corner, A (left) toward left corner
+    const moveX = (moveRight + moveFwd) * 0.7071; // cos(45°) ≈ 0.7071
+    const moveZ = (moveRight - moveFwd) * 0.7071;
 
     // Apply movement
     player.position[0] += moveX * speed;
     player.position[2] += moveZ * speed;
+
+    // Handle jumping
+    if ((keys['Space'] || jumpButton.pressed) && !player.isJumping) {
+        player.velocityY = player.jumpForce;
+        player.isJumping = true;
+    }
+
+    // Apply gravity and vertical movement
+    player.velocityY -= player.gravity;
+    player.position[1] += player.velocityY;
+
+    // Ground collision
+    if (player.position[1] <= 0) {
+        player.position[1] = 0;
+        player.velocityY = 0;
+        player.isJumping = false;
+    }
 
     // Clamp position to room bounds
     clampPlayerToRoom();
