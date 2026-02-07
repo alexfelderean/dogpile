@@ -1,17 +1,10 @@
-// =============================================================================
-// GHOST ABILITY SYSTEM
-// =============================================================================
+// Ghost ability system
 const MAX_GHOSTS = 8;
-const GHOST_RADIUS = 0.7;
-const GHOST_PLAYER_RADIUS = 0.7;  // Player's collision radius for ghost collisions
-
-// Ghost state
 const ghosts = [];
 let currentRecording = [];
 
-// Time loop state
 const timeLoop = {
-    duration: 3,             // Loop duration in seconds
+    duration: 3,
     startTime: 0,
     isRunning: false,
     waitingForInput: false,
@@ -21,10 +14,8 @@ const timeLoop = {
     collisionStartTime: 0
 };
 
-// Pre-allocated model matrix for ghost rendering
 const _ghostModelMatrix = new Float32Array(16);
 
-// --- Time Loop Control ---
 function startTimeLoop(timestamp) {
     timeLoop.waitingForInput = false;
     timeLoop.startTime = timestamp;
@@ -33,32 +24,17 @@ function startTimeLoop(timestamp) {
 }
 
 function resetTimeLoop() {
-    // Save current recording as a ghost
     if (currentRecording.length > 0) {
-        ghosts.push({
-            frames: currentRecording,
-            currentFrame: 0
-        });
-        if (ghosts.length > MAX_GHOSTS) {
-            ghosts.shift();
-        }
+        ghosts.push({ frames: currentRecording, currentFrame: 0 });
+        if (ghosts.length > MAX_GHOSTS) ghosts.shift();
         updateGhostCountUI();
     }
-
     currentRecording = [];
     resetPlayer();
-
-    // Reset ghost playback
-    for (const ghost of ghosts) {
-        ghost.currentFrame = 0;
-        // Reset interpolated position to first frame so ghost visually resets
-        if (ghost.frames.length > 0) {
-            ghost.interpolatedFrame = ghost.frames[0];
-        } else {
-            ghost.interpolatedFrame = null;
-        }
+    for (const g of ghosts) {
+        g.currentFrame = 0;
+        g.interpolatedFrame = g.frames.length > 0 ? g.frames[0] : null;
     }
-
     timeLoop.waitingForInput = true;
     timeLoop.startTime = 0;
     timeLoop.lastRecordTime = 0;
@@ -66,244 +42,99 @@ function resetTimeLoop() {
 
 function setTimeLoopRunning(running) {
     timeLoop.isRunning = running;
-    if (running) {
-        timeLoop.waitingForInput = true;
-        updateGhostCountUI();
-    } else {
-        timeLoop.waitingForInput = false;
-    }
+    timeLoop.waitingForInput = running;
+    if (running) updateGhostCountUI();
 }
 
-function isWaitingForInput() {
-    return timeLoop.waitingForInput;
-}
+function isWaitingForInput() { return timeLoop.waitingForInput; }
+function isTimeLoopRunning() { return timeLoop.isRunning; }
 
-function isTimeLoopRunning() {
-    return timeLoop.isRunning;
-}
-
-// --- Recording ---
 function recordFrame(timestamp) {
     if (!timeLoop.isRunning) return;
-
     if (timestamp - timeLoop.lastRecordTime >= timeLoop.recordInterval) {
         const state = getPlayerState();
-        // Record precise time relative to loop start
         state.time = (timestamp - timeLoop.startTime) / 1000;
         currentRecording.push(state);
         timeLoop.lastRecordTime = timestamp;
     }
 }
 
-// --- Ghost Playback ---
-function lerp(start, end, t) {
-    return start * (1 - t) + end * t;
-}
+function lerp(a, b, t) { return a * (1 - t) + b * t; }
 
-function updateGhosts(elapsedTime) {
-    for (const ghost of ghosts) {
-        if (ghost.frames.length === 0) continue;
-
-        // Find the frame just before current time
-        let idx = ghost.currentFrame;
-        // Ensure index is valid and reset if needed
-        if (idx >= ghost.frames.length - 1) idx = 0;
-
-        // Search forward
-        while (idx < ghost.frames.length - 1 && ghost.frames[idx + 1].time <= elapsedTime) {
-            idx++;
-        }
-        ghost.currentFrame = idx;
-
-        // Interpolate between current frame and next frame
-        const frameA = ghost.frames[idx];
-        const frameB = ghost.frames[idx + 1];
-
-        if (frameB) {
-            const range = frameB.time - frameA.time;
-            const t = range > 0.0001 ? (elapsedTime - frameA.time) / range : 0;
-            const ct = Math.max(0, Math.min(1, t));
-
-            ghost.interpolatedFrame = {
-                x: lerp(frameA.x, frameB.x, ct),
-                y: lerp(frameA.y, frameB.y, ct),
-                z: lerp(frameA.z, frameB.z, ct),
-                yaw: lerp(frameA.yaw, frameB.yaw, ct),
-                pitch: lerp(frameA.pitch, frameB.pitch, ct),
-                time: elapsedTime
-            };
+function updateGhosts(elapsed) {
+    for (const g of ghosts) {
+        if (g.frames.length === 0) continue;
+        let idx = g.currentFrame;
+        if (idx >= g.frames.length - 1) idx = 0;
+        while (idx < g.frames.length - 1 && g.frames[idx + 1].time <= elapsed) idx++;
+        g.currentFrame = idx;
+        const a = g.frames[idx], b = g.frames[idx + 1];
+        if (b) {
+            const range = b.time - a.time;
+            const t = range > 0.0001 ? Math.max(0, Math.min(1, (elapsed - a.time) / range)) : 0;
+            g.interpolatedFrame = { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t), z: lerp(a.z, b.z, t), yaw: lerp(a.yaw, b.yaw, t), pitch: lerp(a.pitch, b.pitch, t), time: elapsed };
         } else {
-            ghost.interpolatedFrame = frameA;
+            g.interpolatedFrame = a;
         }
     }
 }
 
-function getGhostFrame(ghost) {
-    return ghost.interpolatedFrame || (ghost.frames.length > 0 ? ghost.frames[0] : null);
-}
+function getGhostFrame(g) { return g.interpolatedFrame || (g.frames.length > 0 ? g.frames[0] : null); }
 
-// --- Ghost Collisions ---
-const GHOST_SIZE = 1.4;   // Size of ghost cube
-const PLAYER_SIZE = 1.4;  // Size of player cube
+const GHOST_SIZE = 1.4, PLAYER_SIZE = 1.4;
 
 function handleGhostCollisions(timestamp) {
-    if (timestamp - timeLoop.collisionStartTime < timeLoop.collisionDelayTime * 1000) {
-        return;
-    }
-
+    if (timestamp - timeLoop.collisionStartTime < timeLoop.collisionDelayTime * 1000) return;
     let standingOnGhost = false;
-    const ghostHalf = GHOST_SIZE / 2;
-    const playerHalf = PLAYER_SIZE / 2;
-
-    for (const ghost of ghosts) {
-        const frame = getGhostFrame(ghost);
-        if (!frame) continue;
-
-        // Player position
-        const px = player.position[0];
-        const py = player.position[1];
-        const pz = player.position[2];
-
-        // Ghost position
-        const gx = frame.x;
-        const gy = frame.y;
-        const gz = frame.z;
-
-        // AABB collision bounds
-        const playerMinX = px - playerHalf;
-        const playerMaxX = px + playerHalf;
-        const playerMinZ = pz - playerHalf;
-        const playerMaxZ = pz + playerHalf;
-
-        const ghostMinX = gx - ghostHalf;
-        const ghostMaxX = gx + ghostHalf;
-        const ghostMinZ = gz - ghostHalf;
-        const ghostMaxZ = gz + ghostHalf;
-        const ghostTopY = gy + GHOST_SIZE;
-
-        // Check horizontal overlap
-        const overlapX = playerMaxX > ghostMinX && playerMinX < ghostMaxX;
-        const overlapZ = playerMaxZ > ghostMinZ && playerMinZ < ghostMaxZ;
-
+    const gH = GHOST_SIZE / 2, pH = PLAYER_SIZE / 2;
+    for (const g of ghosts) {
+        const f = getGhostFrame(g);
+        if (!f) continue;
+        const px = player.position[0], py = player.position[1], pz = player.position[2];
+        const gx = f.x, gy = f.y, gz = f.z;
+        const pMinX = px - pH, pMaxX = px + pH, pMinZ = pz - pH, pMaxZ = pz + pH;
+        const gMinX = gx - gH, gMaxX = gx + gH, gMinZ = gz - gH, gMaxZ = gz + gH, gTopY = gy + GHOST_SIZE;
+        const overlapX = pMaxX > gMinX && pMinX < gMaxX, overlapZ = pMaxZ > gMinZ && pMinZ < gMaxZ;
         if (overlapX && overlapZ) {
-            // Check for landing on top
-            if (py >= ghostTopY - 0.3 && py <= ghostTopY + 0.5 && player.velocityY <= 0) {
-                // Land on top of ghost
-                player.position[1] = ghostTopY;
-                player.velocityY = 0;
-                player.isJumping = false;
-                standingOnGhost = true;
-                continue;  // Skip horizontal collision for this ghost
+            if (py >= gTopY - 0.3 && py <= gTopY + 0.5 && player.velocityY <= 0) {
+                player.position[1] = gTopY; player.velocityY = 0; player.isJumping = false; standingOnGhost = true; continue;
             }
-
-            // Horizontal collision (only if player is below the top of the ghost)
-            if (py < ghostTopY - 0.1) {
-                // Calculate overlaps on each axis
-                const overlapLeft = playerMaxX - ghostMinX;
-                const overlapRight = ghostMaxX - playerMinX;
-                const overlapBack = playerMaxZ - ghostMinZ;
-                const overlapFront = ghostMaxZ - playerMinZ;
-
-                // Find minimum overlap and push player out
-                const minOverlap = Math.min(overlapLeft, overlapRight, overlapBack, overlapFront);
-
-                if (minOverlap === overlapLeft) {
-                    player.position[0] = ghostMinX - playerHalf;
-                } else if (minOverlap === overlapRight) {
-                    player.position[0] = ghostMaxX + playerHalf;
-                } else if (minOverlap === overlapBack) {
-                    player.position[2] = ghostMinZ - playerHalf;
-                } else if (minOverlap === overlapFront) {
-                    player.position[2] = ghostMaxZ + playerHalf;
-                }
+            if (py < gTopY - 0.1) {
+                const ol = pMaxX - gMinX, or = gMaxX - pMinX, ob = pMaxZ - gMinZ, of = gMaxZ - pMinZ;
+                const m = Math.min(ol, or, ob, of);
+                if (m === ol) player.position[0] = gMinX - pH;
+                else if (m === or) player.position[0] = gMaxX + pH;
+                else if (m === ob) player.position[2] = gMinZ - pH;
+                else if (m === of) player.position[2] = gMaxZ + pH;
             }
         }
     }
-
-    // If player is in the air and not standing on any ghost, check if they are standing on terrain
-    if (!standingOnGhost && player.position[1] > 0 && !player.isJumping && player.velocityY === 0) {
-        // We need to check if we are standing on a tile (this function is in room.js)
-        // Since we can't easily call room.js local function from here without exposing it,
-        // we rely on the main loop calling handleLevelTileCollisions() AFTER this function.
-        // However, handleLevelTileCollisions handles the falling logic if not on a tile.
-        // So we just need to ensure we don't force a fall if we are on a tile.
-
-        // Actually, handleLevelTileCollisions will set isJumping = true if not on a tile.
-        // But if we set isJumping = true here, handleLevelTileCollisions might reset it if on a tile?
-        // Let's look at order: updatePlayer -> handleGhostCollisions -> handleLevelTileCollisions
-
-        // If we are here, we are NOT on a ghost.
-        // If we leave isJumping false, frame recording might define we are floating.
-        // But handleLevelTileCollisions will run next. 
-        // If handleLevelTileCollisions sees we are NOT on a tile, it will set isJumping = true.
-        // If it sees we ARE on a tile, it keeps isJumping = false (or sets it).
-
-        // The issue is if handleGhostCollisions pushes us OFF a ghost, we want to fall.
-        // But if we push off a ghost onto a raised platform, we shouldn't fall.
-
-        // Let's just trust handleLevelTileCollisions to handle gravity enablement.
-        // Removing the forced fall here allows room.js to decide.
-        // But wait, if we were standing on a ghost, standingOnGhost is true.
-        // If we slide off, standingOnGhost becomes false.
-        // Then we enter this block. 
-        // We SHOULD enable jumping (gravity) so we fall, UNLESS room.js says otherwise.
-
-        // So:
-        player.isJumping = true;
-    }
-
-    // However, if we simply set isJumping=true, and then handleLevelTileCollisions runs,
-    // it will check if we are on a tile. If we are, it sets isJumping=false. 
-    // This seems correct.
-
+    if (!standingOnGhost && player.position[1] > 0 && !player.isJumping && player.velocityY === 0) player.isJumping = true;
     clampPlayerToRoom();
 }
 
-// --- UI Updates ---
 function updateTimerUI(elapsed) {
-    const timerFill = document.getElementById('timer-fill');
-
-    if (timeLoop.waitingForInput) {
-        timerFill.style.width = '100%';
-        timerFill.classList.remove('warning');
-        timerFill.classList.add('waiting');
-        return;
-    }
-
-    timerFill.classList.remove('waiting');
-    const remaining = Math.max(0, 1 - elapsed / timeLoop.duration);
-    timerFill.style.width = (remaining * 100) + '%';
-
-    if (remaining < 0.25) {
-        timerFill.classList.add('warning');
-    } else {
-        timerFill.classList.remove('warning');
-    }
+    const fill = document.getElementById('timer-fill');
+    if (timeLoop.waitingForInput) { fill.style.width = '100%'; fill.classList.remove('warning'); fill.classList.add('waiting'); return; }
+    fill.classList.remove('waiting');
+    const r = Math.max(0, 1 - elapsed / timeLoop.duration);
+    fill.style.width = (r * 100) + '%';
+    r < 0.25 ? fill.classList.add('warning') : fill.classList.remove('warning');
 }
 
-function updateGhostCountUI() {
-    const ghostCountEl = document.getElementById('ghost-count');
-    ghostCountEl.textContent = `Ghosts: ${ghosts.length}/${MAX_GHOSTS}`;
-}
+function updateGhostCountUI() { document.getElementById('ghost-count').textContent = `Ghosts: ${ghosts.length}/${MAX_GHOSTS}`; }
 
-// --- Time Loop Update (call each frame) ---
 function updateTimeLoop(timestamp) {
     if (!timeLoop.isRunning) return;
-
-    if (timeLoop.waitingForInput) {
-        updateTimerUI(0);
-    } else {
+    if (timeLoop.waitingForInput) { updateTimerUI(0); }
+    else {
         const elapsed = (timestamp - timeLoop.startTime) / 1000;
         updateTimerUI(elapsed);
         updateGhosts(elapsed);
-
-        if (elapsed >= timeLoop.duration) {
-            resetTimeLoop();
-        }
+        if (elapsed >= timeLoop.duration) resetTimeLoop();
     }
 }
 
-// --- Ghost Rendering ---
 function getGhostModelMatrix(out, x, y, z, yaw) {
     const c = Math.cos(yaw), s = Math.sin(yaw);
     out[0] = c; out[1] = 0; out[2] = s; out[3] = 0;
@@ -312,111 +143,45 @@ function getGhostModelMatrix(out, x, y, z, yaw) {
     out[12] = x; out[13] = y; out[14] = z; out[15] = 1;
 }
 
-function createGhostGeometry() {
-    const positions = [];
-    const colors = [];
-    const normals = [];
-    const indices = [];
-    let vertexOffset = 0;
-
-    function addQuad(p1, p2, p3, p4, color, normal) {
-        positions.push(...p1, ...p2, ...p3, ...p4);
-        for (let i = 0; i < 4; i++) colors.push(...color);
-        for (let i = 0; i < 4; i++) normals.push(...normal);
-        indices.push(
-            vertexOffset, vertexOffset + 1, vertexOffset + 2,
-            vertexOffset, vertexOffset + 2, vertexOffset + 3
-        );
-        vertexOffset += 4;
+function createCubeGeometry(color) {
+    const pos = [], cols = [], norms = [], idx = [];
+    let vo = 0;
+    function addQuad(p1, p2, p3, p4, c, n) {
+        pos.push(...p1, ...p2, ...p3, ...p4);
+        for (let i = 0; i < 4; i++) cols.push(...c);
+        for (let i = 0; i < 4; i++) norms.push(...n);
+        idx.push(vo, vo + 1, vo + 2, vo, vo + 2, vo + 3);
+        vo += 4;
     }
-
-    // Cube dimensions matching pressure plates (1.4x1.4x1.4)
-    const size = 1.4;
-    const half = size / 2;
-    const ghostColor = [0.4, 0.6, 0.9, 0.7];
-
-    // Front (Z+)
-    addQuad([-half, 0, half], [half, 0, half], [half, size, half], [-half, size, half], ghostColor, [0, 0, 1]);
-    // Back (Z-)
-    addQuad([half, 0, -half], [-half, 0, -half], [-half, size, -half], [half, size, -half], ghostColor, [0, 0, -1]);
-    // Left (X-)
-    addQuad([-half, 0, -half], [-half, 0, half], [-half, size, half], [-half, size, -half], ghostColor, [-1, 0, 0]);
-    // Right (X+)
-    addQuad([half, 0, half], [half, 0, -half], [half, size, -half], [half, size, half], ghostColor, [1, 0, 0]);
-    // Top (Y+)
-    addQuad([-half, size, half], [half, size, half], [half, size, -half], [-half, size, -half], ghostColor, [0, 1, 0]);
-    // Bottom (Y-)
-    addQuad([-half, 0, -half], [half, 0, -half], [half, 0, half], [-half, 0, half], ghostColor, [0, -1, 0]);
-
-    return {
-        positions: new Float32Array(positions),
-        colors: new Float32Array(colors),
-        normals: new Float32Array(normals),
-        indices: new Uint16Array(indices),
-        indexCount: indices.length
-    };
+    const s = 1.4, h = s / 2;
+    addQuad([-h, 0, h], [h, 0, h], [h, s, h], [-h, s, h], color, [0, 0, 1]);
+    addQuad([h, 0, -h], [-h, 0, -h], [-h, s, -h], [h, s, -h], color, [0, 0, -1]);
+    addQuad([-h, 0, -h], [-h, 0, h], [-h, s, h], [-h, s, -h], color, [-1, 0, 0]);
+    addQuad([h, 0, h], [h, 0, -h], [h, s, -h], [h, s, h], color, [1, 0, 0]);
+    addQuad([-h, s, h], [h, s, h], [h, s, -h], [-h, s, -h], color, [0, 1, 0]);
+    addQuad([-h, 0, -h], [h, 0, -h], [h, 0, h], [-h, 0, h], color, [0, -1, 0]);
+    return { positions: new Float32Array(pos), colors: new Float32Array(cols), normals: new Float32Array(norms), indices: new Uint16Array(idx), indexCount: idx.length };
 }
 
-function createPlayerGeometry() {
-    const positions = [];
-    const colors = [];
-    const normals = [];
-    const indices = [];
-    let vertexOffset = 0;
+function createGhostGeometry() { return createCubeGeometry([0.4, 0.6, 0.9, 0.7]); }
+function createPlayerGeometry() { return createCubeGeometry([0.9, 0.9, 0.2, 1.0]); }
+function getGhosts() { return ghosts; }
+function clearGhosts() { ghosts.length = 0; currentRecording = []; timeLoop.waitingForInput = true; timeLoop.startTime = 0; timeLoop.lastRecordTime = 0; updateGhostCountUI(); }
+function getGhostModelMatrixForFrame(f) { getGhostModelMatrix(_ghostModelMatrix, f.x, f.y, f.z, f.yaw); return _ghostModelMatrix; }
 
-    function addQuad(p1, p2, p3, p4, color, normal) {
-        positions.push(...p1, ...p2, ...p3, ...p4);
-        for (let i = 0; i < 4; i++) colors.push(...color);
-        for (let i = 0; i < 4; i++) normals.push(...normal);
-        indices.push(
-            vertexOffset, vertexOffset + 1, vertexOffset + 2,
-            vertexOffset, vertexOffset + 2, vertexOffset + 3
-        );
-        vertexOffset += 4;
-    }
-
-    // Cube dimensions matching pressure plates (1.4x1.4x1.4)
-    const size = 1.4;
-    const half = size / 2;
-    const playerColor = [0.9, 0.9, 0.2, 1.0]; // Yellow/gold for player
-
-    // Front (Z+)
-    addQuad([-half, 0, half], [half, 0, half], [half, size, half], [-half, size, half], playerColor, [0, 0, 1]);
-    // Back (Z-)
-    addQuad([half, 0, -half], [-half, 0, -half], [-half, size, -half], [half, size, -half], playerColor, [0, 0, -1]);
-    // Left (X-)
-    addQuad([-half, 0, -half], [-half, 0, half], [-half, size, half], [-half, size, -half], playerColor, [-1, 0, 0]);
-    // Right (X+)
-    addQuad([half, 0, half], [half, 0, -half], [half, size, -half], [half, size, half], playerColor, [1, 0, 0]);
-    // Top (Y+)
-    addQuad([-half, size, half], [half, size, half], [half, size, -half], [-half, size, -half], playerColor, [0, 1, 0]);
-    // Bottom (Y-)
-    addQuad([-half, 0, -half], [half, 0, -half], [half, 0, half], [-half, 0, half], playerColor, [0, -1, 0]);
-
-    return {
-        positions: new Float32Array(positions),
-        colors: new Float32Array(colors),
-        normals: new Float32Array(normals),
-        indices: new Uint16Array(indices),
-        indexCount: indices.length
-    };
-}
-
-function getGhosts() {
-    return ghosts;
-}
-
-// Clear all ghosts and recording (for level transitions)
-function clearGhosts() {
-    ghosts.length = 0;
-    currentRecording = [];
-    timeLoop.waitingForInput = true;
-    timeLoop.startTime = 0;
-    timeLoop.lastRecordTime = 0;
-    updateGhostCountUI();
-}
-
-function getGhostModelMatrixForFrame(frame) {
-    getGhostModelMatrix(_ghostModelMatrix, frame.x, frame.y, frame.z, frame.yaw);
-    return _ghostModelMatrix;
-}
+window.startTimeLoop = startTimeLoop;
+window.resetTimeLoop = resetTimeLoop;
+window.setTimeLoopRunning = setTimeLoopRunning;
+window.isWaitingForInput = isWaitingForInput;
+window.isTimeLoopRunning = isTimeLoopRunning;
+window.recordFrame = recordFrame;
+window.updateGhosts = updateGhosts;
+window.getGhostFrame = getGhostFrame;
+window.handleGhostCollisions = handleGhostCollisions;
+window.updateTimeLoop = updateTimeLoop;
+window.getGhostModelMatrix = getGhostModelMatrix;
+window.createGhostGeometry = createGhostGeometry;
+window.createPlayerGeometry = createPlayerGeometry;
+window.getGhosts = getGhosts;
+window.clearGhosts = clearGhosts;
+window.getGhostModelMatrixForFrame = getGhostModelMatrixForFrame;

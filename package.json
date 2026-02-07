@@ -3,9 +3,12 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "build": "esbuild src/main.js --bundle --minify --sourcemap --outfile=dist/bundle.js",
-    "dev": "esbuild src/main.js --bundle --sourcemap --outfile=dist/bundle.js --watch",
-    "buildnomap": "esbuild src/main.js --bundle --minify --outfile=dist/bundle.js"
+    "clean": "if exist dist rmdir /s /q dist && mkdir dist",
+    "copy": "xcopy /E /I /Y levels dist\\levels && xcopy /E /I /Y textures dist\\textures && copy /Y index.html dist\\index.html",
+    "fixpaths": "powershell -Command \"(Get-Content dist/index.html) -replace 'dist/bundle.js', 'bundle.js' | Set-Content dist/index.html\"",
+    "bundle": "esbuild src/main.js --bundle --minify --outfile=dist/bundle.js",
+    "build": "npm run clean && npm run bundle && npm run copy && npm run fixpaths",
+    "dev": "esbuild src/main.js --bundle --sourcemap --outfile=dist/bundle.js --watch"
   },
   "repository": {
     "type": "git",
