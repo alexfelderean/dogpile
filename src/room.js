@@ -175,13 +175,30 @@ function createRoomGeometry() {
 
     const positions = [];
     const colors = [];
+    const normals = [];
     const indices = [];
     let vertexOffset = 0;
 
-    // Helper to add a quad
+    // Helper to calculate normal from quad vertices (counter-clockwise)
+    function calcNormal(p1, p2, p3) {
+        const ux = p2[0] - p1[0], uy = p2[1] - p1[1], uz = p2[2] - p1[2];
+        const vx = p3[0] - p1[0], vy = p3[1] - p1[1], vz = p3[2] - p1[2];
+        // Cross product
+        let nx = uy * vz - uz * vy;
+        let ny = uz * vx - ux * vz;
+        let nz = ux * vy - uy * vx;
+        // Normalize
+        const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+        if (len > 0) { nx /= len; ny /= len; nz /= len; }
+        return [nx, ny, nz];
+    }
+
+    // Helper to add a quad with automatic normal calculation
     function addQuad(p1, p2, p3, p4, color) {
         positions.push(...p1, ...p2, ...p3, ...p4);
         for (let i = 0; i < 4; i++) colors.push(...color);
+        const normal = calcNormal(p1, p2, p3);
+        for (let i = 0; i < 4; i++) normals.push(...normal);
         indices.push(
             vertexOffset, vertexOffset + 1, vertexOffset + 2,
             vertexOffset, vertexOffset + 2, vertexOffset + 3
@@ -217,11 +234,11 @@ function createRoomGeometry() {
         [roomHalf, 0, -roomHalf],
         [roomHalf, 0, roomHalf],
         [-roomHalf, 0, roomHalf],
-        [0.2, 0.2, 0.22, 1.0]
+        [0.5, 0.5, 0.54, 1.0]
     );
 
     // --- WALLS ---
-    const wallColor = [0.3, 0.32, 0.36, 1.0];
+    const wallColor = [0.55, 0.57, 0.62, 1.0];
 
     // Back wall (Z-)
     addQuad(
@@ -286,6 +303,8 @@ function createRoomGeometry() {
 
         positions.push(cx, tipY, cz, cx + hx1, headBaseY, cz + hz1, cx + hx2, headBaseY, cz + hz2);
         for (let i = 0; i < 3; i++) colors.push(...color);
+        // Normal pointing out of diagonal plane (toward camera in isometric)
+        normals.push(0.7071, 0, 0.7071, 0.7071, 0, 0.7071, 0.7071, 0, 0.7071);
         indices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2);
         vertexOffset += 3;
 
@@ -300,6 +319,12 @@ function createRoomGeometry() {
         );
         for (let i = 0; i < 4; i++) colors.push(...color);
         indices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2, vertexOffset, vertexOffset + 2, vertexOffset + 3);
+        // Same normal for tail quad
+        // for (let i = 0; i < 4; i++) normals.push(0.7071, 0, 0.7071);
+        // indices.push(
+        //     vertexOffset, vertexOffset + 1, vertexOffset + 2,
+        //     vertexOffset, vertexOffset + 2, vertexOffset + 3
+        // );
         vertexOffset += 4;
     }
 
@@ -327,6 +352,7 @@ function createRoomGeometry() {
     return {
         positions: new Float32Array(positions),
         colors: new Float32Array(colors),
+        normals: new Float32Array(normals),
         indices: new Uint16Array(indices),
         indexCount: indices.length
     };
