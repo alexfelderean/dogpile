@@ -162,14 +162,34 @@ function main() {
             lastHeight = canvas.height;
             gl.viewport(0, 0, lastWidth, lastHeight);
 
-            // Orthographic projection sized to fit the room
+            // Calculate proper bounds to fit isometric room
             const aspect = lastWidth / lastHeight;
-            // Room is 18x18 units; diagonal ~25.5 units; need viewSize ~20 for full view with margin
-            const viewSize = 20; // Half-size of visible area
+            const roomSize = GRID_SIZE * CELL_SIZE; // 18 units
+            const bounds = calculateIsometricFitBounds(roomSize, ROOM_HEIGHT, 0.15);
+
+            // Determine view size based on aspect ratio
+            // We want to fit the room with margin in both dimensions
+            const verticalSize = bounds.spanY / 2;
+            const horizontalSize = bounds.spanX / 2;
+
+            // Choose the limiting dimension
+            let viewSize;
+            if (horizontalSize / aspect > verticalSize) {
+                // Width is the limiting factor
+                viewSize = horizontalSize / aspect;
+            } else {
+                // Height is the limiting factor
+                viewSize = verticalSize;
+            }
+
+            // Calculate window bounds with offset to center the room
+            const halfHeight = viewSize;
+            const halfWidth = viewSize * aspect;
+
             mat4Orthographic(_projMatrix,
-                -viewSize * aspect, viewSize * aspect,  // left, right
-                -viewSize, viewSize,                     // bottom, top
-                0.1, 100.0);                             // near, far
+                bounds.centerX - halfWidth, bounds.centerX + halfWidth,   // left, right
+                bounds.centerY - halfHeight, bounds.centerY + halfHeight, // bottom, top
+                -100.0, 100.0);                          // near, far (increased range to ensure nothing is clipped)
             gl.uniformMatrix4fv(uProjection, false, _projMatrix);
         }
 
