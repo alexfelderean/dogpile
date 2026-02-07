@@ -331,6 +331,7 @@ async function main() {
         if (isPlayerActive() && !isWaitingForInput()) {
             updatePlayer();
             handleGhostCollisions(timestamp);
+            handleLevelTileCollisions();
             recordFrame(timestamp);
 
             // Update pressure plates
