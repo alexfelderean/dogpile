@@ -273,12 +273,15 @@ function updatePlayer() {
     return true;
 }
 
-// Clamp player position to room bounds
+// Clamp player position to room bounds (accounting for player cube size)
 function clampPlayerToRoom() {
-    if (player.position[0] > ROOM_HALF_SIZE) player.position[0] = ROOM_HALF_SIZE;
-    else if (player.position[0] < -ROOM_HALF_SIZE) player.position[0] = -ROOM_HALF_SIZE;
-    if (player.position[2] > ROOM_HALF_SIZE) player.position[2] = ROOM_HALF_SIZE;
-    else if (player.position[2] < -ROOM_HALF_SIZE) player.position[2] = -ROOM_HALF_SIZE;
+    const playerHalf = 0.7;  // Half of player cube size (1.4 / 2)
+    const maxPos = ROOM_HALF_SIZE - playerHalf;
+
+    if (player.position[0] > maxPos) player.position[0] = maxPos;
+    else if (player.position[0] < -maxPos) player.position[0] = -maxPos;
+    if (player.position[2] > maxPos) player.position[2] = maxPos;
+    else if (player.position[2] < -maxPos) player.position[2] = -maxPos;
 }
 
 // Get current player state for recording
