@@ -1,6 +1,6 @@
 import { mat4Orthographic, mat4IsometricView, mat4Identity, calculateIsometricFitBounds, _viewMatrix, _projMatrix, compileShader } from './math.js';
 import { player, setupPlayerInput, updatePlayer, getPlayerPosition, getPlayerYaw, hasPlayerInput, isPlayerActive, resetPlayer } from './player.js';
-import { startTimeLoop, isWaitingForInput, isTimeLoopRunning, setTimeLoopRunning, updateTimeLoop, recordFrame, handleGhostCollisions, getGhosts, getGhostFrame, getGhostModelMatrix, getGhostModelMatrixForFrame, getGhostOpacity, clearGhosts, createGhostGeometry, createPlayerGeometry } from './ghost.js';
+import { startTimeLoop, isWaitingForInput, isTimeLoopRunning, setTimeLoopRunning, updateTimeLoop, recordFrame, handleGhostCollisions, getGhosts, getGhostFrame, getGhostModelMatrix, getGhostModelMatrixForFrame, getGhostOpacity, clearGhosts, createGhostGeometry, createPlayerGeometry, createShadowGeometry } from './ghost.js';
 import { updatePressurePlates } from './pressureplate.js';
 import { updatePistons, handlePistonCollisions } from './piston.js';
 import { loadLevel, createRoomGeometry, createArrowGeometry, createWallGeometry, handleLevelTileCollisions, updateDoorCollision, updateDoorLockState, GRID_SIZE, CELL_SIZE, ROOM_HEIGHT } from './room.js';
@@ -33,7 +33,7 @@ async function main() {
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return;
     let room = createRoomGeometry(), arrow = createArrowGeometry(), wallGeom = createWallGeometry();
-    const ghostGeom = createGhostGeometry(), playerGeom = createPlayerGeometry();
+    const ghostGeom = createGhostGeometry(), playerGeom = createPlayerGeometry(), shadowGeom = createShadowGeometry();
     let indexCount = room.indexCount, arrowIndexCount = arrow.indexCount;
     updateWallBuffers(gl, wallGeom);
     let floorGeom = createFloorGeometry();
@@ -141,6 +141,19 @@ async function main() {
     const playerTexCoordBuf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, playerTexCoordBuf);
     gl.bufferData(gl.ARRAY_BUFFER, playerGeom.texCoords, gl.STATIC_DRAW);
+    const shadowPosBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, shadowPosBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, shadowGeom.positions, gl.STATIC_DRAW);
+    const shadowColBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, shadowColBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, shadowGeom.colors, gl.STATIC_DRAW);
+    const shadowNormBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, shadowNormBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, shadowGeom.normals, gl.STATIC_DRAW);
+    const shadowIdxBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, shadowIdxBuf);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, shadowGeom.indices, gl.STATIC_DRAW);
+    const shadowIndexCount = shadowGeom.indexCount;
     const playerTexture = gl.createTexture();
     const playerTextureImg = new Image();
     playerTextureImg.onload = function () {
@@ -267,6 +280,34 @@ async function main() {
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.uniform1f(u_globalAlpha, 1.0);
         const playerPos = getPlayerPosition();
+
+        // --- SHADOW PASS ---
+        gl.uniform1i(uUseTexture, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, shadowPosBuf);
+        gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, shadowNormBuf);
+        gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, shadowColBuf);
+        gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, shadowIdxBuf);
+        // Player shadow
+        getGhostModelMatrix(characterModelMatrix, playerPos[0], 0, playerPos[2], 0);
+        characterModelMatrix[13] += levelTransitionY;
+        gl.uniformMatrix4fv(uModelMatrix, false, characterModelMatrix);
+        gl.drawElements(gl.TRIANGLES, shadowIndexCount, gl.UNSIGNED_SHORT, 0);
+        // Ghost shadows
+        const ghostListForShadows = getGhosts();
+        for (const ghost of ghostListForShadows) {
+            const frame = getGhostFrame(ghost);
+            if (frame) {
+                getGhostModelMatrix(characterModelMatrix, frame.x, 0, frame.z, 0);
+                characterModelMatrix[13] += levelTransitionY;
+                gl.uniformMatrix4fv(uModelMatrix, false, characterModelMatrix);
+                gl.drawElements(gl.TRIANGLES, shadowIndexCount, gl.UNSIGNED_SHORT, 0);
+            }
+        }
+        // ---------------------------
+
         gl.bindBuffer(gl.ARRAY_BUFFER, playerPosBuf);
         gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ARRAY_BUFFER, playerNormBuf);

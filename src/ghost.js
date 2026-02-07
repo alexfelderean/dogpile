@@ -218,6 +218,24 @@ function createCubeGeometry(cubeColor) {
 
 export function createGhostGeometry() { return createCubeGeometry([0.4, 0.6, 0.9, 0.7]); }
 export function createPlayerGeometry() { return createCubeGeometry([0.9, 0.9, 0.2, 1.0]); }
+
+export function createShadowGeometry() {
+    const half = 0.7; // Match cube half-size (1.4 / 2)
+    const y = 0.02;
+    const shadowColor = [0.0, 0.0, 0.0, 0.4];
+    const positions = new Float32Array([
+        -half, y, -half,  half, y, -half,  half, y, half,  -half, y, half
+    ]);
+    const colors = new Float32Array([
+        ...shadowColor, ...shadowColor, ...shadowColor, ...shadowColor
+    ]);
+    const normals = new Float32Array([
+        0, 1, 0,  0, 1, 0,  0, 1, 0,  0, 1, 0
+    ]);
+    const texCoords = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
+    const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
+    return { positions, colors, normals, texCoords, indices, indexCount: 6 };
+}
 export function getGhosts() { return ghosts; }
 
 export function clearGhosts() {
