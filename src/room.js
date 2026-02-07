@@ -328,18 +328,234 @@ export function createArrowGeometry() {
 
 export function createWallGeometry() {
     const roomHalf = getLevelRoomHalf();
-    const positions = [], texCoords = [], indices = [];
+    const positions = [], normals = [], indices = [];
     let vertexOffset = 0;
-    function addWallQuad(p1, p2, p3, p4, u1, v1, u2, v2) {
+
+    // Picket dimensions
+    const picketWidth = 0.3;       // Width of each picket
+    const picketDepth = 0.08;      // Depth/thickness of the picket
+    const picketHeight = 2.0;      // Main body height
+    const picketPointHeight = 0.4; // Pointed top height
+    const picketSpacing = 0.15;    // Space between pickets
+    const railHeight = 0.15;       // Height of horizontal rails
+    const railDepth = 0.06;        // Depth of rails
+    const railOffset1 = 0.4;       // First rail height from base
+    const railOffset2 = 1.4;       // Second rail height from base
+
+    // Add a quad with normal
+    function addQuad(p1, p2, p3, p4, nx, ny, nz) {
         positions.push(...p1, ...p2, ...p3, ...p4);
-        texCoords.push(u1, v1, u1, v2, u2, v2, u2, v1);
+        for (let i = 0; i < 4; i++) normals.push(nx, ny, nz);
         indices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2, vertexOffset, vertexOffset + 2, vertexOffset + 3);
         vertexOffset += 4;
     }
-    addWallQuad([-roomHalf, 0, -roomHalf], [-roomHalf, ROOM_HEIGHT, -roomHalf], [roomHalf, ROOM_HEIGHT, -roomHalf], [roomHalf, 0, -roomHalf], 0, 0, 1, 1);
-    addWallQuad([roomHalf, 0, -roomHalf], [roomHalf, ROOM_HEIGHT, -roomHalf], [roomHalf, ROOM_HEIGHT, roomHalf], [roomHalf, 0, roomHalf], 0, 0, 1, 1);
+
+    // Add a triangle with normal
+    function addTri(p1, p2, p3, nx, ny, nz) {
+        positions.push(...p1, ...p2, ...p3);
+        for (let i = 0; i < 3; i++) normals.push(nx, ny, nz);
+        indices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2);
+        vertexOffset += 3;
+    }
+
+    // Create a single picket at (x, baseY, z) facing direction (0 = -Z, 1 = +X)
+    function addPicket(x, baseY, z, facing) {
+        const hw = picketWidth / 2;
+        const hd = picketDepth / 2;
+        const h = picketHeight;
+        const ph = picketPointHeight;
+        const totalH = h + ph;
+
+        if (facing === 0) {
+            // Facing -Z direction
+            // Front face (facing -Z)
+            addQuad(
+                [x - hw, baseY, z - hd], [x - hw, baseY + h, z - hd],
+                [x + hw, baseY + h, z - hd], [x + hw, baseY, z - hd],
+                0, 0, -1
+            );
+            // Front triangle (point)
+            addTri(
+                [x - hw, baseY + h, z - hd], [x, baseY + totalH, z - hd], [x + hw, baseY + h, z - hd],
+                0, 0, -1
+            );
+            // Back face (facing +Z)
+            addQuad(
+                [x + hw, baseY, z + hd], [x + hw, baseY + h, z + hd],
+                [x - hw, baseY + h, z + hd], [x - hw, baseY, z + hd],
+                0, 0, 1
+            );
+            // Back triangle (point)
+            addTri(
+                [x + hw, baseY + h, z + hd], [x, baseY + totalH, z + hd], [x - hw, baseY + h, z + hd],
+                0, 0, 1
+            );
+            // Left side
+            addQuad(
+                [x - hw, baseY, z + hd], [x - hw, baseY + h, z + hd],
+                [x - hw, baseY + h, z - hd], [x - hw, baseY, z - hd],
+                -1, 0, 0
+            );
+            // Left point side
+            addTri(
+                [x - hw, baseY + h, z + hd], [x, baseY + totalH, z + hd], [x, baseY + totalH, z - hd],
+                -0.8, 0.6, 0
+            );
+            addTri(
+                [x - hw, baseY + h, z + hd], [x, baseY + totalH, z - hd], [x - hw, baseY + h, z - hd],
+                -0.8, 0.6, 0
+            );
+            // Right side
+            addQuad(
+                [x + hw, baseY, z - hd], [x + hw, baseY + h, z - hd],
+                [x + hw, baseY + h, z + hd], [x + hw, baseY, z + hd],
+                1, 0, 0
+            );
+            // Right point side
+            addTri(
+                [x + hw, baseY + h, z - hd], [x, baseY + totalH, z - hd], [x, baseY + totalH, z + hd],
+                0.8, 0.6, 0
+            );
+            addTri(
+                [x + hw, baseY + h, z - hd], [x, baseY + totalH, z + hd], [x + hw, baseY + h, z + hd],
+                0.8, 0.6, 0
+            );
+        } else {
+            // Facing +X direction
+            // Front face (facing +X)
+            addQuad(
+                [x + hd, baseY, z + hw], [x + hd, baseY + h, z + hw],
+                [x + hd, baseY + h, z - hw], [x + hd, baseY, z - hw],
+                1, 0, 0
+            );
+            // Front triangle (point)
+            addTri(
+                [x + hd, baseY + h, z + hw], [x + hd, baseY + totalH, z], [x + hd, baseY + h, z - hw],
+                1, 0, 0
+            );
+            // Back face (facing -X)
+            addQuad(
+                [x - hd, baseY, z - hw], [x - hd, baseY + h, z - hw],
+                [x - hd, baseY + h, z + hw], [x - hd, baseY, z + hw],
+                -1, 0, 0
+            );
+            // Back triangle (point)
+            addTri(
+                [x - hd, baseY + h, z - hw], [x - hd, baseY + totalH, z], [x - hd, baseY + h, z + hw],
+                -1, 0, 0
+            );
+            // Left side (facing -Z)
+            addQuad(
+                [x - hd, baseY, z - hw], [x - hd, baseY + h, z - hw],
+                [x + hd, baseY + h, z - hw], [x + hd, baseY, z - hw],
+                0, 0, -1
+            );
+            // Left point side
+            addTri(
+                [x - hd, baseY + h, z - hw], [x - hd, baseY + totalH, z], [x + hd, baseY + totalH, z],
+                0, 0.6, -0.8
+            );
+            addTri(
+                [x - hd, baseY + h, z - hw], [x + hd, baseY + totalH, z], [x + hd, baseY + h, z - hw],
+                0, 0.6, -0.8
+            );
+            // Right side (facing +Z)
+            addQuad(
+                [x + hd, baseY, z + hw], [x + hd, baseY + h, z + hw],
+                [x - hd, baseY + h, z + hw], [x - hd, baseY, z + hw],
+                0, 0, 1
+            );
+            // Right point side
+            addTri(
+                [x + hd, baseY + h, z + hw], [x + hd, baseY + totalH, z], [x - hd, baseY + totalH, z],
+                0, 0.6, 0.8
+            );
+            addTri(
+                [x + hd, baseY + h, z + hw], [x - hd, baseY + totalH, z], [x - hd, baseY + h, z + hw],
+                0, 0.6, 0.8
+            );
+        }
+    }
+
+    // Add horizontal rail between two points
+    function addRail(x1, y, z1, x2, z2, facing) {
+        const h = railHeight / 2;
+        const d = railDepth / 2;
+
+        if (facing === 0) {
+            // Rail along X axis, facing -Z
+            addQuad([x1, y - h, z1 - d], [x1, y + h, z1 - d], [x2, y + h, z1 - d], [x2, y - h, z1 - d], 0, 0, -1);
+            addQuad([x2, y - h, z1 + d], [x2, y + h, z1 + d], [x1, y + h, z1 + d], [x1, y - h, z1 + d], 0, 0, 1);
+            addQuad([x1, y + h, z1 - d], [x1, y + h, z1 + d], [x2, y + h, z1 + d], [x2, y + h, z1 - d], 0, 1, 0);
+            addQuad([x1, y - h, z1 + d], [x1, y - h, z1 - d], [x2, y - h, z1 - d], [x2, y - h, z1 + d], 0, -1, 0);
+        } else {
+            // Rail along Z axis, facing +X
+            addQuad([x1 + d, y - h, z1], [x1 + d, y + h, z1], [x1 + d, y + h, z2], [x1 + d, y - h, z2], 1, 0, 0);
+            addQuad([x1 - d, y - h, z2], [x1 - d, y + h, z2], [x1 - d, y + h, z1], [x1 - d, y - h, z1], -1, 0, 0);
+            addQuad([x1 - d, y + h, z1], [x1 + d, y + h, z1], [x1 + d, y + h, z2], [x1 - d, y + h, z2], 0, 1, 0);
+            addQuad([x1 - d, y - h, z2], [x1 + d, y - h, z2], [x1 + d, y - h, z1], [x1 - d, y - h, z1], 0, -1, 0);
+        }
+    }
+
+    // Helper to get height at grid position
+    function getHeightAt(row, col) {
+        if (row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE) return 0;
+        return (levelHeight[row] && levelHeight[row][col]) ? levelHeight[row][col] * CELL_SIZE : 0;
+    }
+
+    // Z- wall (back wall) - generate pickets and rails per cell
+    const zWallZ = -roomHalf + 0.1;
+
+    for (let col = 0; col < GRID_SIZE; col++) {
+        const row = 0; // Back edge
+        // Skip fence if door is at this cell
+        if (doorConfig && doorConfig.wall === 'z-' && doorConfig.row === row && doorConfig.col === col) continue;
+        const baseHeight = getHeightAt(row, col);
+        const x = (col - GRID_SIZE / 2 + 0.5) * CELL_SIZE;
+        const cellLeft = x - CELL_SIZE / 2;
+        const cellRight = x + CELL_SIZE / 2;
+
+        // Add pickets for this cell
+        const cellStart = cellLeft + picketWidth / 2 + picketSpacing / 2;
+        const cellEnd = cellRight - picketWidth / 2;
+
+        for (let px = cellStart; px <= cellEnd; px += picketWidth + picketSpacing) {
+            addPicket(px, baseHeight, zWallZ, 0);
+        }
+
+        // Add rails for this cell only (stays within cell boundaries)
+        addRail(cellLeft, baseHeight + railOffset1, zWallZ, cellRight, zWallZ, 0);
+        addRail(cellLeft, baseHeight + railOffset2, zWallZ, cellRight, zWallZ, 0);
+    }
+
+    // X+ wall (right wall) - generate pickets and rails per cell
+    const xWallX = roomHalf - 0.1;
+
+    for (let row = 0; row < GRID_SIZE; row++) {
+        const col = GRID_SIZE - 1; // Right edge
+        // Skip fence if door is at this cell
+        if (doorConfig && doorConfig.wall === 'x+' && doorConfig.row === row && doorConfig.col === col) continue;
+        const baseHeight = getHeightAt(row, col);
+        const z = (row - GRID_SIZE / 2 + 0.5) * CELL_SIZE;
+        const cellBack = z - CELL_SIZE / 2;
+        const cellFront = z + CELL_SIZE / 2;
+
+        // Add pickets for this cell
+        const cellStart = cellBack + picketWidth / 2 + picketSpacing / 2;
+        const cellEnd = cellFront - picketWidth / 2;
+
+        for (let pz = cellStart; pz <= cellEnd; pz += picketWidth + picketSpacing) {
+            addPicket(xWallX, baseHeight, pz, 1);
+        }
+
+        // Add rails for this cell only (stays within cell boundaries)
+        addRail(xWallX, baseHeight + railOffset1, cellBack, xWallX, cellFront, 1);
+        addRail(xWallX, baseHeight + railOffset2, cellBack, xWallX, cellFront, 1);
+    }
+
     return {
-        positions: new Float32Array(positions), texCoords: new Float32Array(texCoords),
+        positions: new Float32Array(positions), normals: new Float32Array(normals),
         indices: new Uint16Array(indices), indexCount: indices.length
     };
 }
+

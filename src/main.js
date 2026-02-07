@@ -7,6 +7,7 @@ import { loadLevel, createRoomGeometry, createArrowGeometry, createWallGeometry,
 import { initFloorShader, createFloorGeometry, updateFloorBuffers, renderFloor } from './floor.js';
 import { initWallShader, updateWallBuffers, renderWalls } from './wall.js';
 import { initSkyShader, renderSky } from './sky.js';
+import { toggleMusic } from './audio.js';
 
 const vsSource = `attribute vec4 aPosition;attribute vec3 aNormal;attribute vec4 aColor;attribute vec2 aTexCoord;uniform mat4 uModelMatrix;uniform mat4 uViewMatrix;uniform mat4 uProjectionMatrix;varying lowp vec4 vColor;varying highp vec3 vNormal;varying highp vec3 vWorldPos;varying highp vec2 vTexCoord;void main(){vec4 worldPos=uModelMatrix*aPosition;gl_Position=uProjectionMatrix*uViewMatrix*worldPos;vColor=aColor;vTexCoord=aTexCoord;vNormal=mat3(uModelMatrix)*aNormal;vWorldPos=worldPos.xyz;}`;
 
@@ -121,7 +122,7 @@ async function main() {
         const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g.indices, gl.STATIC_DRAW); ghostIdxBufs.push(ib);
         ghostIndexCounts.push(g.indexCount);
     }
-    
+
     // Ghost Legs (3 Types)
     const ghostLegGeoms = [createGhostLegGeometryBlack(), createGhostLegGeometryWheaten(), createGhostLegGeometryBrindle()];
     const ghostLegPosBufs = [], ghostLegColBufs = [], ghostLegNormBufs = [], ghostLegIdxBufs = [];
@@ -143,7 +144,7 @@ async function main() {
         const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g.indices, gl.STATIC_DRAW); ghostTailIdxBufs.push(ib);
     }
     const ghostTailIndexCount = ghostTailGeoms[0].indexCount;
-    
+
     // Player Geometries (3 Types - all with scarf)
     const playerGeoms = [createPlayerGeometryBlack(), createPlayerGeometryWheaten(), createPlayerGeometryBrindle()];
     const playerPosBufs = [], playerColBufs = [], playerNormBufs = [], playerIdxBufs = [], playerIndexCounts = [];
@@ -176,7 +177,7 @@ async function main() {
         const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g.indices, gl.STATIC_DRAW); playerTailIdxBufs.push(ib);
     }
     const playerTailIndexCount = playerTailGeoms[0].indexCount;
-    
+
     // Animation state
     let playerLegPhase = 0, lastPlayerPos = [0, 0, 0];
     const shadowPosBuf = gl.createBuffer();
@@ -379,7 +380,7 @@ async function main() {
         // Helper to render legs
         function renderLegs(pos, yaw, legPhase, isGhost, opacity = 1.0, type = 0) {
             const legGeomIndexCount = isGhost ? ghostLegIndexCount : playerLegIndexCount;
-            const legBufs = isGhost ? 
+            const legBufs = isGhost ?
                 { pos: ghostLegPosBufs[type], norm: ghostLegNormBufs[type], col: ghostLegColBufs[type], idx: ghostLegIdxBufs[type] } :
                 { pos: playerLegPosBufs[currentPlayerColor], norm: playerLegNormBufs[currentPlayerColor], col: playerLegColBufs[currentPlayerColor], idx: playerLegIdxBufs[currentPlayerColor] };
 
@@ -396,15 +397,15 @@ async function main() {
             for (const leg of LEG_POSITIONS) {
                 const legMatrix = new Float32Array(16);
                 mat4Identity(legMatrix);
-                
+
                 // 1. Translation to position (x, y, z)
                 // 2. Rotation (yaw)
                 // 3. Leg offset (relative to body center)
                 // 4. Leg swing rotation (around pivot)
-                
+
                 // We'll construct this by combining transforms:
                 // Global = Translate(pos) * Rotate(yaw) * Translate(legOffset) * Translate(0, pivotY, 0) * Rotate(swing) * Translate(0, -pivotY, 0)
-                
+
                 // But since we have a simple hierarchy, we can do it step-by-step or use a matrix stack. 
                 // Let's use getGhostModelMatrix as a base for body transform (pos + yaw).
                 getGhostModelMatrix(legMatrix, pos[0], pos[1], pos[2], yaw);
@@ -415,51 +416,51 @@ async function main() {
                 const c = Math.cos(yaw), s = Math.sin(yaw);
                 const wx = leg.x * c - leg.z * s;
                 const wz = leg.x * s + leg.z * c;
-                
+
                 legMatrix[12] += wx;
                 legMatrix[14] += wz;
 
                 // Calculate swing angle
                 const swingAmplitude = 0.6;
                 const swingAngle = Math.sin(legPhase + leg.phase) * swingAmplitude;
-                
+
                 // Apply swing rotation around X axis (local leg space)
                 // Since leg geometry is axis-aligned, we can rotate around the local X axis relative to the leg pivot
                 // Pivot is at LEG_PIVOT_Y relative to ground (0)
-                
+
                 // We need to rotate around the pivot point. 
                 // M = M * Translate(0, pivot, 0) * RotateX(angle) * Translate(0, -pivot, 0)
-                
+
                 // To avoid complex matrix math, let's just create a rotation matrix and multiply
                 // But we are in a simple engine.
-                
+
                 // Let's manually apply the rotation to the matrix
                 // The current matrix M puts us at the leg's top attachment point (approximately)
                 // Let's adjust the indices directly? No, that's hard with the rotation.
-                
+
                 // Create a local rotation matrix for the leg swing
                 const swingMatrix = new Float32Array(16);
                 mat4Identity(swingMatrix);
-                
+
                 // Translate to pivot
                 swingMatrix[13] = LEG_PIVOT_Y;
-                
+
                 // Rotate X
                 const sc = Math.cos(swingAngle), ss = Math.sin(swingAngle);
                 const rotMatrix = new Float32Array(16);
                 mat4Identity(rotMatrix);
                 rotMatrix[5] = sc; rotMatrix[6] = ss;
                 rotMatrix[9] = -ss; rotMatrix[10] = sc;
-                
+
                 // Translate back
                 const transBack = new Float32Array(16);
                 mat4Identity(transBack);
                 transBack[13] = -LEG_PIVOT_Y;
-                
+
                 // Combine: Swing * Rot * Back
                 // Since we want to apply this TO the existing transform:
                 // Final = BodyTransform * OffsetTransform * SwingTransform
-                
+
                 // Simplified approach:
                 // The leg geometry is centered at (0, -height/2, 0) relative to its origin? 
                 // No, createLegGeometry creates it with offset X/Z but centered Y?
@@ -473,60 +474,60 @@ async function main() {
                 // addBoxToArrays(..., 0, -legHeight/2, 0, ...) -> box center is at y = -legHeight/2. Size is legHeight.
                 // So y ranges from -legHeight to 0. Correct.
                 // So the geometry origin (0,0,0) is the top of the leg (pivot point).
-                
+
                 // So we just need to:
                 // 1. Translate to body position + body rotation
                 // 2. Translate by leg offset (rotated by body yaw)
                 // 3. Rotate by swing angle (X axis)
                 // 4. Draw
-                
+
                 // Construct matrix:
                 // We have legMatrix which is at Body Pos + rotated offset.
                 // Now just rotate X local.
-                
+
                 // To rotate X local (which is axis perpendicular to direction facing? No, yaw rotates Y)
                 // If yaw is 0, dog faces -Z. X is right.
                 // Leg swing is around X axis.
                 // So we just rotate around global X? No, local X.
                 // Since we applied yaw, the local X is rotated.
                 // The matrix already has the rotation. We can just multiply a rotation matrix?
-                
+
                 // If M is the model matrix so far (Pos * RotY), then M * RotX will rotate around the *local* X axis?
                 // Yes, if we multiply on the right.
-                
+
                 // M_new = M * RotX(swing)
-                
+
                 // Manual multiplication of M * RotX
                 // RotX: 
                 // 1  0  0  0
                 // 0  c  s  0
                 // 0 -s  c  0
                 // 0  0  0  1
-                
+
                 // Col 0: M[0], M[1], M[2], M[3] (unchanged)
                 // Col 1: M[4]*c + M[8]*-s, ...
                 // Col 2: M[4]*s + M[8]*c, ...
                 // Col 3: M[12]... (unchanged)
-                
+
                 const m = legMatrix;
                 const m4 = m[4], m5 = m[5], m6 = m[6], m7 = m[7];
                 const m8 = m[8], m9 = m[9], m10 = m[10], m11 = m[11];
-                
+
                 // Rotate around pivot Y (which is the origin of the geometry)
                 // But wait, the geometry is at (0, -h/2, 0) relative to 0? 
                 // Yes, 0 is the top. So standard RotX works perfect.
-                
+
                 // Apply rotation
                 m[4] = m4 * sc + m8 * ss;
                 m[5] = m5 * sc + m9 * ss;
                 m[6] = m6 * sc + m10 * ss;
                 m[7] = m7 * sc + m11 * ss;
-                
+
                 m[8] = m4 * -ss + m8 * sc;
                 m[9] = m5 * -ss + m9 * sc;
                 m[10] = m6 * -ss + m10 * sc;
                 m[11] = m7 * -ss + m11 * sc;
-                
+
                 // Now translate Y up to the pivot point in world space?
                 // The body render puts the body at `pos`.
                 // `pos` is the bottom center of the collision box? 
@@ -539,8 +540,8 @@ async function main() {
                 // But we already included that in the geometry?
                 // No, created geometry is local.
                 // We simply need to translate the leg up to the pivot height relative to the ground.
-                m[13] += LEG_PIVOT_Y; 
-                
+                m[13] += LEG_PIVOT_Y;
+
                 gl.uniformMatrix4fv(uModelMatrix, false, m);
                 gl.drawElements(gl.TRIANGLES, legGeomIndexCount, gl.UNSIGNED_SHORT, 0);
             }
@@ -574,7 +575,7 @@ async function main() {
         characterModelMatrix[13] += levelTransitionY;
         gl.uniformMatrix4fv(uModelMatrix, false, characterModelMatrix);
         gl.drawElements(gl.TRIANGLES, playerIndexCounts[currentPlayerColor], gl.UNSIGNED_SHORT, 0);
-        
+
         // Player Legs
         renderLegs(playerPos, getPlayerYaw(), playerLegPhase, false);
 
@@ -590,7 +591,7 @@ async function main() {
         gl.bindBuffer(gl.ARRAY_BUFFER, playerTailColBufs[currentPlayerColor]);
         gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerTailIdxBufs[currentPlayerColor]);
-        
+
         getGhostModelMatrix(tailMatrix, px, py, pz, getPlayerYaw());
         tailMatrix[13] += levelTransitionY;
         mat4Translate(tailMatrix, 0, TAIL_PIVOT_Y, TAIL_OFFSET_Z);
@@ -610,15 +611,15 @@ async function main() {
                 gl.bindBuffer(gl.ARRAY_BUFFER, ghostColBufs[type]);
                 gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
                 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ghostIdxBufs[type]);
-                
+
                 gl.uniform1i(uUseTexture, 0);
-                
+
                 for (const ghost of ghostList) {
                     if ((ghost.colorType || 0) !== type) continue;
-                    
+
                     const opacity = getGhostOpacity(timestamp);
                     gl.uniform1f(u_globalAlpha, opacity);
-                    
+
                     const frame = getGhostFrame(ghost);
                     if (frame) {
                         // Update ghost leg phase
@@ -635,7 +636,7 @@ async function main() {
                         gl.drawElements(gl.TRIANGLES, ghostIndexCounts[type], gl.UNSIGNED_SHORT, 0);
                     }
                 }
-                
+
                 // Ghost Legs
                 for (const ghost of ghostList) {
                     if ((ghost.colorType || 0) !== type) continue;
@@ -645,7 +646,7 @@ async function main() {
                         renderLegs([frame.x, frame.y, frame.z], frame.yaw, ghost.legPhase, true, opacity, type);
                     }
                 }
-                
+
                 // Ghost Tails
                 const tailPhase = timestamp * 0.008;
                 const tailWag = Math.sin(tailPhase) * 0.4;
