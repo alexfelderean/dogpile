@@ -27,6 +27,8 @@ export function resetTimeLoop() {
     for (const ghost of ghosts) {
         ghost.currentFrame = 0;
         ghost.interpolatedFrame = ghost.frames.length > 0 ? ghost.frames[0] : null;
+        ghost.lastX = undefined; 
+        ghost.lastZ = undefined;
     }
     timeLoop.waitingForInput = true;
     timeLoop.startTime = 0;
@@ -187,28 +189,53 @@ export function getGhostModelMatrix(out, x, y, z, yaw) {
     out[12] = x; out[13] = y; out[14] = z; out[15] = 1;
 }
 
-function createCubeGeometry(cubeColor) {
-    const positions = [], colors = [], normals = [], texCoords = [], indices = [];
-    let vertexOffset = 0;
-    const uvTop = { v0: 0, v1: 1 / 3 };
-    const uvFront = { v0: 1 / 3, v1: 2 / 3 };
-    const uvOther = { v0: 2 / 3, v1: 1 };
-    function addQuad(p1, p2, p3, p4, color, normal, uvRegion, flipV = false) {
-        positions.push(...p1, ...p2, ...p3, ...p4);
-        for (let i = 0; i < 4; i++) colors.push(...color);
-        for (let i = 0; i < 4; i++) normals.push(...normal);
-        if (flipV) texCoords.push(0, uvRegion.v1, 1, uvRegion.v1, 1, uvRegion.v0, 0, uvRegion.v0);
-        else texCoords.push(0, uvRegion.v0, 1, uvRegion.v0, 1, uvRegion.v1, 0, uvRegion.v1);
-        indices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2, vertexOffset, vertexOffset + 2, vertexOffset + 3);
-        vertexOffset += 4;
+// Simple hash for noise
+function hash(x, y, z) {
+    let n = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453;
+    return n - Math.floor(n);
+}
+
+// Scale factor: make dog visually larger than collision box
+const DOG_SCALE = 1.3;
+
+function addBoxToArrays(positions, colors, normals, texCoords, indices, vertexOffset, cx, cy, cz, sx, sy, sz, color, addNoise = true) {
+    const hx = sx / 2, hy = sy / 2, hz = sz / 2;
+    const faces = [
+        { n: [0, 0, 1], verts: [[cx-hx, cy-hy, cz+hz], [cx+hx, cy-hy, cz+hz], [cx+hx, cy+hy, cz+hz], [cx-hx, cy+hy, cz+hz]] },
+        { n: [0, 0, -1], verts: [[cx+hx, cy-hy, cz-hz], [cx-hx, cy-hy, cz-hz], [cx-hx, cy+hy, cz-hz], [cx+hx, cy+hy, cz-hz]] },
+        { n: [-1, 0, 0], verts: [[cx-hx, cy-hy, cz-hz], [cx-hx, cy-hy, cz+hz], [cx-hx, cy+hy, cz+hz], [cx-hx, cy+hy, cz-hz]] },
+        { n: [1, 0, 0], verts: [[cx+hx, cy-hy, cz+hz], [cx+hx, cy-hy, cz-hz], [cx+hx, cy+hy, cz-hz], [cx+hx, cy+hy, cz+hz]] },
+        { n: [0, 1, 0], verts: [[cx-hx, cy+hy, cz+hz], [cx+hx, cy+hy, cz+hz], [cx+hx, cy+hy, cz-hz], [cx-hx, cy+hy, cz-hz]] },
+        { n: [0, -1, 0], verts: [[cx-hx, cy-hy, cz-hz], [cx+hx, cy-hy, cz-hz], [cx+hx, cy-hy, cz+hz], [cx-hx, cy-hy, cz+hz]] }
+    ];
+    let offset = vertexOffset;
+    for (const face of faces) {
+        for (const v of face.verts) {
+            positions.push(v[0], v[1], v[2]);
+            normals.push(face.n[0], face.n[1], face.n[2]);
+            let noise = addNoise ? (hash(v[0] * 10, v[1] * 10, v[2] * 10) - 0.5) * 0.3 : 0;
+            colors.push(
+                Math.max(0, Math.min(1, color[0] + noise)),
+                Math.max(0, Math.min(1, color[1] + noise * 0.8)),
+                Math.max(0, Math.min(1, color[2] + noise * 0.6)),
+                color[3]
+            );
+            texCoords.push(0, 0);
+        }
+        indices.push(offset, offset + 1, offset + 2, offset, offset + 2, offset + 3);
+        offset += 4;
     }
-    const size = 1.4, half = size / 2;
-    addQuad([-half, 0, half], [half, 0, half], [half, size, half], [-half, size, half], cubeColor, [0, 0, 1], uvFront, true);
-    addQuad([half, 0, -half], [-half, 0, -half], [-half, size, -half], [half, size, -half], cubeColor, [0, 0, -1], uvOther);
-    addQuad([-half, 0, -half], [-half, 0, half], [-half, size, half], [-half, size, -half], cubeColor, [-1, 0, 0], uvOther);
-    addQuad([half, 0, half], [half, 0, -half], [half, size, -half], [half, size, half], cubeColor, [1, 0, 0], uvOther);
-    addQuad([-half, size, half], [half, size, half], [half, size, -half], [-half, size, -half], cubeColor, [0, 1, 0], uvTop, true);
-    addQuad([-half, 0, -half], [half, 0, -half], [half, 0, half], [-half, 0, half], cubeColor, [0, -1, 0], uvOther);
+    return offset;
+}
+
+// Create a single leg geometry
+function createLegGeometry(baseColor, offsetX, offsetZ) {
+    const positions = [], colors = [], normals = [], texCoords = [], indices = [];
+    const legWidth = 0.15 * DOG_SCALE;
+    const legHeight = 0.5 * DOG_SCALE;
+    // Leg is centered at origin, pivots from top
+    addBoxToArrays(positions, colors, normals, texCoords, indices, 0,
+        offsetX, -legHeight / 2, offsetZ, legWidth, legHeight, legWidth, baseColor);
     return {
         positions: new Float32Array(positions), colors: new Float32Array(colors),
         normals: new Float32Array(normals), texCoords: new Float32Array(texCoords),
@@ -216,8 +243,101 @@ function createCubeGeometry(cubeColor) {
     };
 }
 
-export function createGhostGeometry() { return createCubeGeometry([0.4, 0.6, 0.9, 0.7]); }
-export function createPlayerGeometry() { return createCubeGeometry([0.9, 0.9, 0.2, 1.0]); }
+function createDogBodyGeometry(baseColor) {
+    const positions = [], colors = [], normals = [], texCoords = [], indices = [];
+    let vertexOffset = 0;
+    
+    function addBox(cx, cy, cz, sx, sy, sz, color, addNoise = true) {
+        vertexOffset = addBoxToArrays(positions, colors, normals, texCoords, indices, vertexOffset,
+            cx * DOG_SCALE, cy * DOG_SCALE, cz * DOG_SCALE, 
+            sx * DOG_SCALE, sy * DOG_SCALE, sz * DOG_SCALE, color, addNoise);
+    }
+    
+    // Dog dimensions
+    const bodyHeight = 0.5;
+    const bodyLength = 1.0;
+    const bodyWidth = 0.5;
+    const legHeight = 0.5;
+    const headSize = 0.4;
+    const earWidth = 0.1;
+    const earHeight = 0.25;
+    const earDepth = 0.08;
+    const tailWidth = 0.1;
+    const tailLength = 0.4;
+    
+    const groundY = 0;
+    const bodyY = groundY + legHeight + bodyHeight / 2;
+    
+    // Body
+    addBox(0, bodyY, 0, bodyWidth, bodyHeight, bodyLength, baseColor);
+    
+    // Head
+    const headY = bodyY + bodyHeight / 2 - headSize / 4;
+    const headZ = bodyLength / 2 + headSize / 2 - 0.05;
+    addBox(0, headY, headZ, headSize, headSize, headSize, baseColor);
+    
+    // Snout
+    const snoutWidth = 0.2;
+    const snoutHeight = 0.15;
+    const snoutDepth = 0.15;
+    addBox(0, headY - 0.05, headZ + headSize / 2 + snoutDepth / 2 - 0.02, snoutWidth, snoutHeight, snoutDepth, baseColor);
+    
+    // Ears
+    const earY = headY + headSize / 2 + earHeight / 2 - 0.05;
+    const earOffsetX = headSize / 2 - earWidth / 2 - 0.02;
+    addBox(-earOffsetX, earY, headZ, earWidth, earHeight, earDepth, baseColor);
+    addBox(earOffsetX, earY, headZ, earWidth, earHeight, earDepth, baseColor);
+    
+    // Tail
+    const tailY = bodyY + bodyHeight / 4;
+    const tailZ = -bodyLength / 2 - tailLength / 2 + 0.1;
+    addBox(0, tailY + 0.15, tailZ, tailWidth, tailWidth, tailLength, baseColor);
+    
+    // Eyes
+    const eyeSize = 0.08;
+    const eyeY = headY + 0.05;
+    const eyeZ = headZ + headSize / 2 - 0.01;
+    const eyeOffsetX = 0.1;
+    const white = [1, 1, 1, 1];
+    const black = [0.05, 0.05, 0.05, 1];
+    
+    addBox(-eyeOffsetX, eyeY, eyeZ, eyeSize, eyeSize, 0.02, white, false);
+    addBox(eyeOffsetX, eyeY, eyeZ, eyeSize, eyeSize, 0.02, white, false);
+    addBox(-eyeOffsetX, eyeY, eyeZ + 0.015, eyeSize * 0.5, eyeSize * 0.5, 0.02, black, false);
+    addBox(eyeOffsetX, eyeY, eyeZ + 0.015, eyeSize * 0.5, eyeSize * 0.5, 0.02, black, false);
+    
+    // Nose
+    const noseSize = 0.08;
+    addBox(0, headY - 0.02, headZ + headSize / 2 + snoutDepth - 0.02, noseSize, noseSize * 0.7, noseSize * 0.5, black, false);
+    
+    return {
+        positions: new Float32Array(positions), colors: new Float32Array(colors),
+        normals: new Float32Array(normals), texCoords: new Float32Array(texCoords),
+        indices: new Uint16Array(indices), indexCount: indices.length
+    };
+}
+
+// Leg positions (relative offsets for each leg)
+const bodyWidth = 0.5, bodyLength = 1.0, legWidth = 0.15;
+const legOffsetX = ((bodyWidth / 2) - (legWidth / 4)) * DOG_SCALE; // Center on edge
+const legOffsetZ = (bodyLength / 2 - legWidth / 2 - 0.1) * DOG_SCALE;
+const legPivotY = 0.5 * DOG_SCALE; // legHeight
+
+export const LEG_POSITIONS = [
+    { x: -legOffsetX, z: legOffsetZ, phase: 0 },      // Front-left
+    { x: legOffsetX, z: legOffsetZ, phase: Math.PI },  // Front-right
+    { x: -legOffsetX, z: -legOffsetZ, phase: Math.PI }, // Back-left
+    { x: legOffsetX, z: -legOffsetZ, phase: 0 }        // Back-right
+];
+export const LEG_PIVOT_Y = legPivotY;
+export const DOG_VISUAL_SCALE = DOG_SCALE;
+
+// Ghost dog: bluish-gray color
+export function createGhostGeometry() { return createDogBodyGeometry([0.5, 0.6, 0.75, 0.7]); }
+export function createGhostLegGeometry() { return createLegGeometry([0.5, 0.6, 0.75, 0.7], 0, 0); }
+// Player dog: golden/yellow color
+export function createPlayerGeometry() { return createDogBodyGeometry([0.85, 0.65, 0.3, 1.0]); }
+export function createPlayerLegGeometry() { return createLegGeometry([0.85, 0.65, 0.3, 1.0], 0, 0); }
 
 export function createShadowGeometry() {
     const half = 0.7; // Match cube half-size (1.4 / 2)

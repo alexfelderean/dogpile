@@ -5,7 +5,7 @@ export const player = {
     jumpForce: 0.25, gravity: 0.015, yaw: 0, targetYaw: 0
 };
 const DIR_POS_Z = 0, DIR_POS_X = -Math.PI / 2, DIR_NEG_Z = Math.PI, DIR_NEG_X = Math.PI / 2;
-const ROTATION_LERP_SPEED = 0.25;
+const ROTATION_LERP_SPEED = 0.12;
 
 function normalizeAngle(angle) {
     while (angle > Math.PI) angle -= 2 * Math.PI;
@@ -156,9 +156,9 @@ export function updatePlayer() {
         const moveZ = (moveRight - moveFwd) * 0.7071;
         player.position[0] += moveX * speed;
         player.position[2] += moveZ * speed;
-        const absMoveX = Math.abs(moveX), absMoveZ = Math.abs(moveZ);
-        if (absMoveX > absMoveZ) player.targetYaw = moveX > 0 ? DIR_POS_X : DIR_NEG_X;
-        else if (absMoveZ > absMoveX) player.targetYaw = moveZ > 0 ? DIR_POS_Z : DIR_NEG_Z;
+        if (moveX !== 0 || moveZ !== 0) {
+            player.targetYaw = Math.atan2(-moveX, moveZ);
+        }
     }
     player.yaw = lerpAngle(player.yaw, player.targetYaw, ROTATION_LERP_SPEED);
     if ((keys['Space'] || jumpButton.pressed) && (!player.isJumping || isPlayerOnGhost())) {
