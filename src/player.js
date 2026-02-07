@@ -43,16 +43,16 @@ export function setupPlayerInput(canvas, onFirstInput) {
     });
     document.addEventListener('keyup', (e) => { keys[e.code] = false; });
 
-    const timerBar = document.getElementById('timer-bar');
-    const ghostCount = document.getElementById('ghost-count');
-    const joystickZone = document.getElementById('joystick-zone');
-    const joystickKnob = document.getElementById('joystick-knob');
-    const jumpBtn = document.getElementById('jump-button');
+    const timerBar = document.getElementById('t');
+    const ghostCount = document.getElementById('gc');
+    const joystickZone = document.getElementById('jz');
+    const joystickKnob = document.getElementById('jk');
+    const jumpBtn = document.getElementById('jp');
 
-    timerBar.classList.remove('hidden');
-    ghostCount.classList.remove('hidden');
-    joystickZone.classList.remove('hidden');
-    jumpBtn.classList.remove('hidden');
+    timerBar.classList.remove('h');
+    ghostCount.classList.remove('h');
+    joystickZone.classList.remove('h');
+    jumpBtn.classList.remove('h');
 
     function updateJoystickVisual() {
         let dx = joystick.current.x - joystick.origin.x;
@@ -70,7 +70,7 @@ export function setupPlayerInput(canvas, onFirstInput) {
         e.preventDefault();
         jumpButton.pressed = true;
         jumpButton.id = e.changedTouches[0].identifier;
-        jumpBtn.classList.add('pressed');
+        jumpBtn.classList.add('pr');
     }, { passive: false });
 
     jumpBtn.addEventListener('touchend', (e) => {
@@ -78,7 +78,7 @@ export function setupPlayerInput(canvas, onFirstInput) {
         e.preventDefault();
         jumpButton.pressed = false;
         jumpButton.id = null;
-        jumpBtn.classList.remove('pressed');
+        jumpBtn.classList.remove('pr');
     }, { passive: false });
 
     canvas.addEventListener('touchstart', (e) => {

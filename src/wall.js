@@ -1,10 +1,8 @@
+import { compileShader } from './math.js';
+
 const wallVsSource = `attribute vec4 aPosition;attribute vec2 aTexCoord;uniform mat4 uModelMatrix;uniform mat4 uViewMatrix;uniform mat4 uProjectionMatrix;varying vec2 vUV;void main(){vec4 worldPos=uModelMatrix*aPosition;gl_Position=uProjectionMatrix*uViewMatrix*worldPos;vUV=aTexCoord;}`;
 
-const wallFsSource = `precision highp float;varying vec2 vUV;uniform float uNumberOfBricksHeight;uniform float uNumberOfBricksWidth;uniform vec3 uBrickColor;uniform vec3 uJointColor;
-float random(in vec2 st){return fract(sin(dot(st.xy,vec2(12.9898,78.233)))*43758.5453123);}
-float noise(in vec2 st){vec2 i=floor(st);vec2 f=fract(st);float a=random(i);float b=random(i+vec2(1.0,0.0));float c=random(i+vec2(0.0,1.0));float d=random(i+vec2(1.0,1.0));vec2 u=f*f*(3.0-2.0*f);return mix(a,b,u.x)+(c-a)*u.y*(1.0-u.x)+(d-b)*u.x*u.y;}
-float fbm(in vec2 st){float value=0.0;float amplitud=.5;for(int i=0;i<6;i++){value+=amplitud*noise(st);st*=2.;amplitud*=.5;}return value;}
-void main(void){vec2 u_resolution=vec2(uNumberOfBricksWidth,uNumberOfBricksHeight);vec2 st=vUV*u_resolution/4.0;float v0=smoothstep(-1.0,1.0,sin(st.x*14.0+fbm(st.xx*vec2(100.0,12.0))*8.0));float v1=random(st);float v2=noise(st*vec2(20.0,1.4))-noise(st*vec2(100.0,6.4));vec3 col=vec3(0.860,0.806,0.574);col=mix(col,vec3(0.390,0.265,0.192),v0);col=mix(col,vec3(0.930,0.493,0.502),v1*0.5);col-=v2*0.2;gl_FragColor=vec4(col,1.0);}`;
+const wallFsSource = `precision highp float;varying vec2 vUV;uniform float uNumberOfBricksHeight,uNumberOfBricksWidth;uniform vec3 uBrickColor,uJointColor;float m(vec2 v){return fract(sin(dot(v.xy,vec2(12.9898,78.233)))*43758.5453123);}float x(vec2 v){vec2 f=floor(v),x=fract(v);float y=m(f),z=m(f+vec2(1,0));x=x*x*(3.-2.*x);return mix(y,z,x.x)+(m(f+vec2(0,1))-y)*x.y*(1.-x.x)+(m(f+vec2(1))-z)*x.x*x.y;}float u(vec2 v){float f=0.,z=.5;for(int u=0;u<6;u++)f+=z*x(v),v*=2.,z*=.5;return f;}void main(){vec2 v=vUV*vec2(uNumberOfBricksWidth,uNumberOfBricksHeight)/4.;gl_FragColor=vec4(mix(mix(vec3(.86,.806,.574),vec3(.39,.265,.192),smoothstep(-1.,1.,sin(v.x*14.+u(v.xx*vec2(100,12))*8.))),vec3(.93,.493,.502),m(v)*.5)-(x(v*vec2(20,1.4))-x(v*vec2(100,6.4)))*.2,1);}`;
 
 let wallProgram = null, wallPositionBuffer = null, wallTexCoordBuffer = null, wallIndexBuffer = null, wallIndexCount = 0;
 let wallUModelMatrix = null, wallUViewMatrix = null, wallUProjectionMatrix = null;
@@ -12,15 +10,8 @@ let wallUBricksHeight = null, wallUBricksWidth = null, wallUBrickColor = null, w
 let wallAPosition = null, wallATexCoord = null;
 
 export function initWallShader(gl) {
-    function compileShader(type, source) {
-        const shader = gl.createShader(type);
-        gl.shaderSource(shader, source);
-        gl.compileShader(shader);
-        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { gl.deleteShader(shader); return null; }
-        return shader;
-    }
-    const vs = compileShader(gl.VERTEX_SHADER, wallVsSource);
-    const fs = compileShader(gl.FRAGMENT_SHADER, wallFsSource);
+    const vs = compileShader(gl, gl.VERTEX_SHADER, wallVsSource);
+    const fs = compileShader(gl, gl.FRAGMENT_SHADER, wallFsSource);
     if (!vs || !fs) return false;
     wallProgram = gl.createProgram();
     gl.attachShader(wallProgram, vs);

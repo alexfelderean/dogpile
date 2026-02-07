@@ -1,4 +1,5 @@
 import { getLevelGridSize, getLevelCellSize, getCurrentLevel } from './room.js';
+import { compileShader } from './math.js';
 
 const floorVsSource = `attribute vec4 aPosition;attribute vec2 aTexCoord;uniform mat4 uModelMatrix;uniform mat4 uViewMatrix;uniform mat4 uProjectionMatrix;varying vec2 vMsg;varying vec3 vWorldPos;void main(){vec4 worldPos=uModelMatrix*aPosition;gl_Position=uProjectionMatrix*uViewMatrix*worldPos;vWorldPos=worldPos.xyz;vMsg=aTexCoord;}`;
 
@@ -9,28 +10,15 @@ const floorFsSource = `precision highp float;uniform float uTime;varying vec3 vW
 #define HASHSCALE1 .1031
 #define HASHSCALE3 vec3(.1031,.1030,.0973)
 #define PI 3.14159265359
-float hash12(vec2 p){vec3 p3=fract(vec3(p.xyx)*HASHSCALE1);p3+=dot(p3,p3.yzx+19.19);return fract((p3.x+p3.y)*p3.z);}
-vec3 hash32(vec2 p){vec3 p3=fract(vec3(p.xyx)*HASHSCALE3);p3+=dot(p3,p3.yxz+19.19);return fract((p3.xxy+p3.yzz)*p3.zyx);}
-vec2 hash22(vec2 p){vec3 p3=fract(vec3(p.xyx)*HASHSCALE3);p3+=dot(p3,p3.yzx+19.19);return fract((p3.xx+p3.yz)*p3.zy);}
-vec3 getGrassColor(float x){vec3 a=vec3(0.2,0.4,0.3);vec3 b=vec3(0.3,0.5,0.2);vec3 c=vec3(0.2,0.4,0.2);vec3 d=vec3(0.66,0.77,0.33);return a+b*cos(2.*PI*(c*x+d));}
-float getGrassBlade(in vec2 position,in vec2 grassPos,out vec4 color){vec3 grassVector3=hash32(grassPos*123.41)*2.0-vec3(1);grassVector3.z=grassVector3.z*0.2+0.2;vec2 grassVector2=normalize(grassVector3.xy);float wind=sin(uTime*1.5+grassPos.x*0.5+grassPos.y*0.5)*0.4;grassVector2.x+=wind*0.5;grassVector2.y+=wind*0.5;grassVector2=normalize(grassVector2);float grassLength=hash12(grassPos*102.7)*0.2+0.25;vec2 gv=position-grassPos;float gx=dot(grassVector2,gv);float gy=dot(vec2(-grassVector2.y,grassVector2.x),gv);float gxn=gx/grassLength;if(gxn>=0.0&&gxn<=1.0&&abs(gy)<=0.04*(1.-gxn*gxn)){vec3 thisGrassColor=getGrassColor(hash12(grassPos*26.6));color=vec4(thisGrassColor*(0.2+0.8*gxn),1.0);return grassVector3.z*gxn;}else{color=vec4(0.,0.,0.,1.);return -1.0;}}
-float getPoint(in vec2 position,out vec4 color){float scale=1.0;vec2 scaledPos=position*scale;int ox=int(floor(scaledPos.x/BLADES_SPACING));int oy=int(floor(scaledPos.y/BLADES_SPACING));float maxz=0.0;vec4 bgColor=vec4(0.15,0.12,0.1,1.0);color=bgColor;for(int i=-LOOKUP_DIST;i<=LOOKUP_DIST;++i){for(int j=-LOOKUP_DIST;j<=LOOKUP_DIST;++j){vec2 upos=vec2(float(ox+i),float(oy+j));vec2 grassPos=(upos*BLADES_SPACING+hash22(upos)*JITTER_MAX);vec4 tempColor;float z=getGrassBlade(scaledPos,grassPos,tempColor);if(z>maxz){maxz=z;color=tempColor;}}}return maxz;}
-void main(void){vec4 color;float z=getPoint(vWorldPos.xz,color);gl_FragColor=color;}`;
+float v(vec2 v){vec3 f=fract(vec3(v.xyx)*HASHSCALE1);f+=dot(f,f.yzx+19.19);return fract((f.x+f.y)*f.z);}vec3 t(vec2 v){vec3 f=fract(vec3(v.xyx)*HASHSCALE3);f+=dot(f,f.yxz+19.19);return fract((f.xxy+f.yzz)*f.zyx);}vec2 f(vec2 v){vec3 f=fract(vec3(v.xyx)*HASHSCALE3);f+=dot(f,f.yzx+19.19);return fract((f.xx+f.yz)*f.zy);}vec3 f(float v){return vec3(.2,.4,.3)+vec3(.3,.5,.2)*cos(2.*PI*(vec3(.2,.4,.2)*v+vec3(.66,.77,.33)));}float f(vec2 u,vec2 m,out vec4 r){vec3 i=t(m*123.41)*2.-vec3(1);i.z=i.z*.2+.2;vec2 y=normalize(i.xy);float x=sin(uTime*1.5+m.x*.5+m.y*.5)*.4;y.x+=x*.5;y.y+=x*.5;y=normalize(y);x=v(m*102.7)*.2+.25;vec2 z=u-m;float d=dot(y,z),s=dot(vec2(-y.y,y),z);x=d/x;if(x>=0.&&x<=1.&&abs(s)<=.04*(1.-x*x)){vec3 u=f(v(m*26.6));r=vec4(u*(.2+.8*x),1);return i.z*x;}return r=vec4(0,0,0,1),-1.;}float f(vec2 v,out vec4 r){vec2 m=v;int x=int(floor(m.x/BLADES_SPACING)),y=int(floor(m.y/BLADES_SPACING));float z=0.;r=vec4(.15,.12,.1,1);for(int v=-LOOKUP_DIST;v<=LOOKUP_DIST;++v)for(int u=-LOOKUP_DIST;u<=LOOKUP_DIST;++u){vec2 i=vec2(float(x+v),float(y+u));i=i*BLADES_SPACING+f(i)*JITTER_MAX;vec4 d;float s=f(m,i,d);if(s>z)z=s,r=d;}return z;}void main(){vec4 v;float r=f(vWorldPos.xz,v);gl_FragColor=v;}`;
 
 let floorProgram = null, floorPositionBuffer = null, floorIndexBuffer = null, floorIndexCount = 0;
 let floorUModelMatrix = null, floorUViewMatrix = null, floorUProjectionMatrix = null, floorUTime = null;
 let floorAPosition = null;
 
 export function initFloorShader(gl) {
-    function compileShader(type, source) {
-        const shader = gl.createShader(type);
-        gl.shaderSource(shader, source);
-        gl.compileShader(shader);
-        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { gl.deleteShader(shader); return null; }
-        return shader;
-    }
-    const vs = compileShader(gl.VERTEX_SHADER, floorVsSource);
-    const fs = compileShader(gl.FRAGMENT_SHADER, floorFsSource);
+    const vs = compileShader(gl, gl.VERTEX_SHADER, floorVsSource);
+    const fs = compileShader(gl, gl.FRAGMENT_SHADER, floorFsSource);
     if (!vs || !fs) return false;
     floorProgram = gl.createProgram();
     gl.attachShader(floorProgram, vs);

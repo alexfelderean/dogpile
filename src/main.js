@@ -1,4 +1,4 @@
-import { mat4Orthographic, mat4IsometricView, mat4Identity, calculateIsometricFitBounds, _viewMatrix, _projMatrix } from './math.js';
+import { mat4Orthographic, mat4IsometricView, mat4Identity, calculateIsometricFitBounds, _viewMatrix, _projMatrix, compileShader } from './math.js';
 import { player, setupPlayerInput, updatePlayer, getPlayerPosition, getPlayerYaw, hasPlayerInput, isPlayerActive, resetPlayer } from './player.js';
 import { startTimeLoop, isWaitingForInput, isTimeLoopRunning, setTimeLoopRunning, updateTimeLoop, recordFrame, handleGhostCollisions, getGhosts, getGhostFrame, getGhostModelMatrix, getGhostModelMatrixForFrame, getGhostOpacity, clearGhosts, createGhostGeometry, createPlayerGeometry } from './ghost.js';
 import { updatePressurePlates } from './pressureplate.js';
@@ -14,7 +14,7 @@ const fsSource = `precision highp float;varying lowp vec4 vColor;varying highp v
 
 async function main() {
     await loadLevel('levels/l1.bin');
-    const canvas = document.getElementById('glCanvas');
+    const canvas = document.getElementById('c');
     let lastWidth = 0, lastHeight = 0;
     function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
     resizeCanvas();
@@ -24,15 +24,9 @@ async function main() {
     initSkyShader(gl);
     initWallShader(gl);
     initFloorShader(gl);
-    function compileShader(type, source) {
-        const shader = gl.createShader(type);
-        gl.shaderSource(shader, source);
-        gl.compileShader(shader);
-        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { gl.deleteShader(shader); return null; }
-        return shader;
-    }
-    const vs = compileShader(gl.VERTEX_SHADER, vsSource);
-    const fs = compileShader(gl.FRAGMENT_SHADER, fsSource);
+
+    const vs = compileShader(gl, gl.VERTEX_SHADER, vsSource);
+    const fs = compileShader(gl, gl.FRAGMENT_SHADER, fsSource);
     const program = gl.createProgram();
     gl.attachShader(program, vs);
     gl.attachShader(program, fs);

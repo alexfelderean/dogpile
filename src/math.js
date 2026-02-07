@@ -59,3 +59,41 @@ export function calculateIsometricFitBounds(roomSize, roomHeight, marginPercent 
         centerY: (minY + maxY) / 2
     };
 }
+
+// Shared shader compilation
+export function compileShader(gl, type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { gl.deleteShader(shader); return null; }
+    return shader;
+}
+
+// Shared AABB collision helper - returns push direction or null
+export function aabbCollision(px, py, pz, playerRadius, objX, objZ, objHalf, objHeight, player) {
+    const minX = objX - objHalf - playerRadius, maxX = objX + objHalf + playerRadius;
+    const minZ = objZ - objHalf - playerRadius, maxZ = objZ + objHalf + playerRadius;
+    if (px > minX && px < maxX && pz > minZ && pz < maxZ) {
+        // Standing on top check
+        if (py >= objHeight - 0.3 && py <= objHeight + 0.5 && player.velocityY <= 0) {
+            const strictMinX = objX - objHalf - playerRadius * 0.8;
+            const strictMaxX = objX + objHalf + playerRadius * 0.8;
+            const strictMinZ = objZ - objHalf - playerRadius * 0.8;
+            const strictMaxZ = objZ + objHalf + playerRadius * 0.8;
+            if (px > strictMinX && px < strictMaxX && pz > strictMinZ && pz < strictMaxZ) {
+                return { type: 'top', height: objHeight };
+            }
+        }
+        // Side collision
+        if (py < objHeight - 0.1) {
+            const overlapLeft = maxX - px, overlapRight = px - minX;
+            const overlapBack = maxZ - pz, overlapFront = pz - minZ;
+            const minOverlap = Math.min(overlapLeft, overlapRight, overlapBack, overlapFront);
+            if (minOverlap === overlapLeft) return { type: 'side', axis: 'x', value: maxX };
+            if (minOverlap === overlapRight) return { type: 'side', axis: 'x', value: minX };
+            if (minOverlap === overlapBack) return { type: 'side', axis: 'z', value: maxZ };
+            if (minOverlap === overlapFront) return { type: 'side', axis: 'z', value: minZ };
+        }
+    }
+    return null;
+}
