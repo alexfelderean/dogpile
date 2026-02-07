@@ -15,6 +15,34 @@ function mat4Perspective(out, fov, aspect, near, far) {
     out[12] = 0; out[13] = 0; out[14] = 2 * far * near * nf; out[15] = 0;
 }
 
+function mat4Orthographic(out, left, right, bottom, top, near, far) {
+    const lr = 1 / (left - right);
+    const bt = 1 / (bottom - top);
+    const nf = 1 / (near - far);
+    out[0] = -2 * lr; out[1] = 0; out[2] = 0; out[3] = 0;
+    out[4] = 0; out[5] = -2 * bt; out[6] = 0; out[7] = 0;
+    out[8] = 0; out[9] = 0; out[10] = 2 * nf; out[11] = 0;
+    out[12] = (left + right) * lr; out[13] = (top + bottom) * bt; out[14] = (far + near) * nf; out[15] = 1;
+}
+
+// Isometric view matrix - fixed camera looking at origin
+function mat4IsometricView(out) {
+    // Isometric angles: 45° Y rotation, ~35.264° X tilt (arctan(1/sqrt(2)))
+    const yaw = Math.PI / 4;      // 45 degrees
+    const pitch = Math.atan(1 / Math.sqrt(2)); // ~35.264 degrees
+    
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    
+    // Combined rotation matrix (pitch * yaw) then translate back
+    const dist = 80; // Camera distance from origin (increased to avoid clipping)
+    
+    out[0] = cy;      out[1] = sy * sp;     out[2] = -sy * cp;    out[3] = 0;
+    out[4] = 0;       out[5] = cp;          out[6] = sp;          out[7] = 0;
+    out[8] = sy;      out[9] = -cy * sp;    out[10] = cy * cp;    out[11] = 0;
+    out[12] = 0;      out[13] = 0;          out[14] = -dist;      out[15] = 1;
+}
+
 function mat4Identity(out) {
     out[0] = 1; out[1] = 0; out[2] = 0; out[3] = 0;
     out[4] = 0; out[5] = 1; out[6] = 0; out[7] = 0;

@@ -249,6 +249,39 @@ function createGhostGeometry() {
     };
 }
 
+function createPlayerGeometry() {
+    const positions = [];
+    const colors = [];
+    const indices = [];
+    let vertexOffset = 0;
+
+    function addQuad(p1, p2, p3, p4, color) {
+        positions.push(...p1, ...p2, ...p3, ...p4);
+        for (let i = 0; i < 4; i++) colors.push(...color);
+        indices.push(
+            vertexOffset, vertexOffset + 1, vertexOffset + 2,
+            vertexOffset, vertexOffset + 2, vertexOffset + 3
+        );
+        vertexOffset += 4;
+    }
+
+    const w = 0.15, h = 0.8, d = 0.15;
+    const playerColor = [0.9, 0.9, 0.2, 1.0]; // Yellow/gold for player
+
+    addQuad([-w, 0, d], [w, 0, d], [w, h * 2, d], [-w, h * 2, d], playerColor);
+    addQuad([w, 0, -d], [-w, 0, -d], [-w, h * 2, -d], [w, h * 2, -d], playerColor);
+    addQuad([-w, 0, -d], [-w, 0, d], [-w, h * 2, d], [-w, h * 2, -d], playerColor);
+    addQuad([w, 0, d], [w, 0, -d], [w, h * 2, -d], [w, h * 2, d], playerColor);
+    addQuad([-w, h * 2, d], [w, h * 2, d], [w, h * 2, -d], [-w, h * 2, -d], playerColor);
+
+    return {
+        positions: new Float32Array(positions),
+        colors: new Float32Array(colors),
+        indices: new Uint16Array(indices),
+        indexCount: indices.length
+    };
+}
+
 function getGhosts() {
     return ghosts;
 }

@@ -3,11 +3,8 @@
 // =============================================================================
 // Camera/player state
 const player = {
-    position: [0, 1.6, 0],  // Eye height
-    yaw: 0,                  // Horizontal rotation (radians)
-    pitch: 0,                // Vertical rotation (radians)
-    speed: 0.08,
-    sensitivity: 0.002
+    position: [0, 0, 0],  // Ground level
+    speed: 0.08
 };
 
 // Room bounds for collision (9x9 grid * 2 cell size = 18 units wide, half = 9, with margin)
@@ -16,9 +13,8 @@ const PLAYER_RADIUS = 0.3;
 
 // Input state
 const keys = {};
-let isPointerLocked = false;
-let isTouchMode = false;
 let gameActive = false;
+let isTouchMode = false;
 
 // Touch controls state
 const joystick = { 
@@ -29,31 +25,17 @@ const joystick = {
     current: { x: 0, y: 0 },
     radius: 50 // Max drag radius
 };
-const touchLook = { 
-    id: null, 
-    active: false, 
-    lastX: 0, 
-    lastY: 0 
-};
-
-// Build camera view matrix
-function getPlayerViewMatrix(out) {
-    mat4Identity(out);
-    mat4RotateX(out, -player.pitch);
-    mat4RotateY(out, -player.yaw);
-    _tempVec3[0] = -player.position[0];
-    _tempVec3[1] = -player.position[1];
-    _tempVec3[2] = -player.position[2];
-    mat4Translate(out, _tempVec3);
-}
 
 // Reset player to starting position
 function resetPlayer() {
     player.position[0] = 0;
-    player.position[1] = 1.6;
+    player.position[1] = 0;
     player.position[2] = 0;
-    player.yaw = 0;
-    player.pitch = 0;
+}
+
+// Get player position for rendering
+function getPlayerPosition() {
+    return player.position;
 }
 
 // Setup keyboard and mouse input
@@ -62,36 +44,20 @@ function setupPlayerInput(canvas, onFirstInput) {
     document.addEventListener('keydown', (e) => {
         keys[e.code] = true;
         // Prevent scrolling for game keys
-        if (['KeyW', 'KeyS', 'KeyA', 'KeyD', 'Space'].includes(e.code)) {
+        if (['KeyW', 'KeyS', 'KeyA', 'KeyD', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
             e.preventDefault();
+        }
+        // Start game on any movement key
+        if (gameActive && onFirstInput) {
+            onFirstInput();
         }
     });
     document.addEventListener('keyup', (e) => {
         keys[e.code] = false;
     });
 
-    const clampPitch = () => {
-         if (player.pitch > 1.57) player.pitch = 1.57;
-        else if (player.pitch < -1.57) player.pitch = -1.57;
-    };
-
-    // Mouse movement
-    document.addEventListener('mousemove', (e) => {
-        if (!isPointerLocked) return;
-
-        // Callback for first input
-        if (onFirstInput && onFirstInput()) {
-            // First input handled
-        }
-
-        player.yaw -= e.movementX * player.sensitivity;
-        player.pitch -= e.movementY * player.sensitivity;
-        clampPitch();
-    });
-
-    // Pointer lock & UI Elements
+    // UI Elements
     const overlay = document.getElementById('overlay');
-    const crosshair = document.getElementById('crosshair');
     const timerBar = document.getElementById('timer-bar');
     const ghostCount = document.getElementById('ghost-count');
     const joystickZone = document.getElementById('joystick-zone');
@@ -102,50 +68,30 @@ function setupPlayerInput(canvas, onFirstInput) {
         gameActive = active;
         if (active) {
             overlay.classList.add('hidden');
-            crosshair.classList.remove('hidden');
             timerBar.classList.remove('hidden');
             ghostCount.classList.remove('hidden');
-            // Show joystick if in touch mode
-            if (isTouchMode) {
-                joystickZone.classList.remove('hidden');
-            }
+            joystickZone.classList.remove('hidden');
         } else {
             overlay.classList.remove('hidden');
-            crosshair.classList.add('hidden');
             timerBar.classList.add('hidden');
             ghostCount.classList.add('hidden');
             joystickZone.classList.add('hidden');
         }
     }
 
-    // Desktop Click
+    // Click to start (no pointer lock needed for isometric)
     overlay.addEventListener('click', () => {
-        canvas.requestPointerLock();
+        setGameActive(true);
+        if (onFirstInput) onFirstInput();
     });
 
     // Touch Start on Overlay
     overlay.addEventListener('touchstart', (e) => {
         isTouchMode = true;
-        // Initial touch often doesn't allow immediate pointer lock or fullscreen
-        // but we can start the game logic
         setGameActive(true);
         if (onFirstInput) onFirstInput();
         e.preventDefault();
     }, { passive: false });
-
-    // Pointer lock state changes
-    document.addEventListener('pointerlockchange', () => {
-        isPointerLocked = document.pointerLockElement === canvas;
-        if (isPointerLocked) {
-            isTouchMode = false;
-            setGameActive(true);
-        } else {
-            // Only pause if we werent in touch mode
-            if (!isTouchMode) {
-                setGameActive(false);
-            }
-        }
-    });
 
     // -------------------------------------------------------------------------
     // TOUCH CONTROLS
@@ -174,42 +120,28 @@ function setupPlayerInput(canvas, onFirstInput) {
 
     canvas.addEventListener('touchstart', (e) => {
         if (!gameActive) return;
-        e.preventDefault(); // Prevent scrolling
+        e.preventDefault();
 
         for (let i = 0; i < e.changedTouches.length; i++) {
             const t = e.changedTouches[i];
             const x = t.clientX;
             const y = t.clientY;
 
-            // Simple zone logic: Left half = move | Right half = look
-            // Better: Check valid hit on joystick area?
-            // Let's use left half for dynamic joystick logic or strict joystick 
-            // The user asked for "joystick on the left", "panning finger on right".
-            // We have a visible joystick. Let's make it so you have to grab near it.
-            
+            // Any touch can control the joystick
             const rect = joystickZone.getBoundingClientRect();
             const centerX = rect.left + rect.width / 2;
             const centerY = rect.top + rect.height / 2;
             const distToJoystick = Math.hypot(x - centerX, y - centerY);
 
-            if (distToJoystick < 100) { // Hit near joystick
-                if (!joystick.active) {
-                    joystick.id = t.identifier;
-                    joystick.active = true;
-                    joystick.origin.x = centerX;
-                    joystick.origin.y = centerY;
-                    joystick.current.x = x;
-                    joystick.current.y = y;
-                    updateJoystickVisual();
-                }
-            } else if (x > window.innerWidth / 2) {
-                // Right side look
-                if (!touchLook.active) {
-                    touchLook.id = t.identifier;
-                    touchLook.active = true;
-                    touchLook.lastX = x;
-                    touchLook.lastY = y;
-                }
+            if (distToJoystick < 150 && !joystick.active) {
+                joystick.id = t.identifier;
+                joystick.active = true;
+                joystick.origin.x = centerX;
+                joystick.origin.y = centerY;
+                joystick.current.x = x;
+                joystick.current.y = y;
+                updateJoystickVisual();
+                if (onFirstInput) onFirstInput();
             }
         }
     }, { passive: false });
@@ -226,19 +158,6 @@ function setupPlayerInput(canvas, onFirstInput) {
                 joystick.current.y = t.clientY;
                 updateJoystickVisual();
             }
-            else if (t.identifier === touchLook.id) {
-                const dx = t.clientX - touchLook.lastX;
-                const dy = t.clientY - touchLook.lastY;
-                
-                // Adjust sensitivity for touch
-                const touchSens = player.sensitivity * 3.0; // Faster than mouse usually needed
-                player.yaw -= dx * touchSens;
-                player.pitch -= dy * touchSens;
-                clampPitch();
-                
-                touchLook.lastX = t.clientX;
-                touchLook.lastY = t.clientY;
-            }
         }
     }, { passive: false });
 
@@ -254,12 +173,7 @@ function setupPlayerInput(canvas, onFirstInput) {
                 joystick.id = null;
                 joystick.vector.x = 0;
                 joystick.vector.y = 0;
-                // Reset visual
                 joystickKnob.style.transform = `translate(-50%, -50%)`;
-            }
-            else if (t.identifier === touchLook.id) {
-                touchLook.active = false;
-                touchLook.id = null;
             }
         }
     });
@@ -268,37 +182,45 @@ function setupPlayerInput(canvas, onFirstInput) {
 // Check if player has any movement input
 function hasPlayerInput() {
     return keys['KeyW'] || keys['KeyS'] || keys['KeyA'] || keys['KeyD'] ||
+           keys['ArrowUp'] || keys['ArrowDown'] || keys['ArrowLeft'] || keys['ArrowRight'] ||
            Math.abs(joystick.vector.x) > 0.1 || Math.abs(joystick.vector.y) > 0.1;
 }
 
-// Update player position based on input
+// Update player position based on input (world-relative for isometric)
 function updatePlayer() {
     if (!isPlayerActive()) return false;
 
-    const sinYaw = Math.sin(player.yaw);
-    const cosYaw = Math.cos(player.yaw);
     const speed = player.speed;
 
-    let moveFwd = 0;
-    let moveRight = 0;
+    let moveX = 0;
+    let moveZ = 0;
 
-    // Keyboard
-    if (keys['KeyW']) moveFwd += 1;
-    if (keys['KeyS']) moveFwd -= 1;
-    if (keys['KeyA']) moveRight -= 1;
-    if (keys['KeyD']) moveRight += 1;
+    // Keyboard - world-relative movement
+    // In isometric view: W/Up = -Z (away), S/Down = +Z (toward)
+    //                    A/Left = -X (left), D/Right = +X (right)
+    if (keys['KeyW'] || keys['ArrowUp']) moveZ -= 1;
+    if (keys['KeyS'] || keys['ArrowDown']) moveZ += 1;
+    if (keys['KeyA'] || keys['ArrowLeft']) moveX -= 1;
+    if (keys['KeyD'] || keys['ArrowRight']) moveX += 1;
 
-    // Joystick
-    moveRight += joystick.vector.x;
-    moveFwd -= joystick.vector.y; // Up onscreen (-y) means move forward (+fwd)
+    // Joystick - world-relative
+    // joystick.vector.x = left/right = X axis
+    // joystick.vector.y = up/down = Z axis (up screen = -Z)
+    moveX += joystick.vector.x;
+    moveZ += joystick.vector.y;
 
-    if (moveFwd === 0 && moveRight === 0) return false;
+    if (moveX === 0 && moveZ === 0) return false;
+
+    // Normalize diagonal movement
+    const len = Math.sqrt(moveX * moveX + moveZ * moveZ);
+    if (len > 1) {
+        moveX /= len;
+        moveZ /= len;
+    }
 
     // Apply movement
-    // X = -sin(yaw)*fwd + cos(yaw)*right
-    // Z = -cos(yaw)*fwd - sin(yaw)*right
-    player.position[0] += (moveRight * cosYaw - moveFwd * sinYaw) * speed;
-    player.position[2] += (moveRight * (-sinYaw) - moveFwd * cosYaw) * speed;
+    player.position[0] += moveX * speed;
+    player.position[2] += moveZ * speed;
 
     // Clamp position to room bounds
     clampPlayerToRoom();
@@ -320,12 +242,12 @@ function getPlayerState() {
         x: player.position[0],
         y: player.position[1],
         z: player.position[2],
-        yaw: player.yaw,
-        pitch: player.pitch
+        yaw: 0,   // No rotation in isometric
+        pitch: 0
     };
 }
 
-// Check if pointer is locked
+// Check if game is active
 function isPlayerActive() {
     return gameActive;
 }

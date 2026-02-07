@@ -72,6 +72,7 @@ function main() {
     // Create geometry
     const room = createRoomGeometry();
     const ghostGeom = createGhostGeometry();
+    const playerGeom = createPlayerGeometry();
 
     // Room buffers
     const posBuf = gl.createBuffer();
@@ -99,6 +100,19 @@ function main() {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ghostIdxBuf);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, ghostGeom.indices, gl.STATIC_DRAW);
 
+    // Player buffers
+    const playerPosBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, playerPosBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, playerGeom.positions, gl.STATIC_DRAW);
+
+    const playerColBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, playerColBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, playerGeom.colors, gl.STATIC_DRAW);
+
+    const playerIdxBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerIdxBuf);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, playerGeom.indices, gl.STATIC_DRAW);
+
     // Attribute & uniform locations
     const aPosition = gl.getAttribLocation(program, 'aPosition');
     const aColor = gl.getAttribLocation(program, 'aColor');
@@ -109,6 +123,9 @@ function main() {
     // Identity matrix for room
     const identityMatrix = new Float32Array(16);
     mat4Identity(identityMatrix);
+
+    // Character model matrix (reused for player and ghosts)
+    const characterModelMatrix = new Float32Array(16);
 
     // WebGL state
     gl.enable(gl.DEPTH_TEST);
@@ -121,6 +138,7 @@ function main() {
 
     const indexCount = room.indexCount;
     const ghostIndexCount = ghostGeom.indexCount;
+    const playerIndexCount = playerGeom.indexCount;
 
     // Setup input with callback for first input
     setupPlayerInput(canvas, () => {
@@ -143,7 +161,15 @@ function main() {
             lastWidth = canvas.width;
             lastHeight = canvas.height;
             gl.viewport(0, 0, lastWidth, lastHeight);
-            mat4Perspective(_projMatrix, 70 * Math.PI / 180, lastWidth / lastHeight, 0.1, 100.0);
+            
+            // Orthographic projection sized to fit the room
+            const aspect = lastWidth / lastHeight;
+            // Room is 18x18 units; diagonal ~25.5 units; need viewSize ~20 for full view with margin
+            const viewSize = 20; // Half-size of visible area
+            mat4Orthographic(_projMatrix, 
+                -viewSize * aspect, viewSize * aspect,  // left, right
+                -viewSize, viewSize,                     // bottom, top
+                0.1, 100.0);                             // near, far
             gl.uniformMatrix4fv(uProjection, false, _projMatrix);
         }
 
@@ -165,8 +191,8 @@ function main() {
         // Clear and render
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        // View matrix
-        getPlayerViewMatrix(_viewMatrix);
+        // Isometric view matrix (fixed camera angle)
+        mat4IsometricView(_viewMatrix);
         gl.uniformMatrix4fv(uViewMatrix, false, _viewMatrix);
 
         // Draw room
@@ -178,12 +204,24 @@ function main() {
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
         gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, 0);
 
-        // Draw ghosts
+        // Enable blending for semi-transparent characters
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+        // Draw player (yellow/gold)
+        const playerPos = getPlayerPosition();
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerPosBuf);
+        gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerColBuf);
+        gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerIdxBuf);
+        getGhostModelMatrix(characterModelMatrix, playerPos[0], playerPos[1], playerPos[2], 0);
+        gl.uniformMatrix4fv(uModelMatrix, false, characterModelMatrix);
+        gl.drawElements(gl.TRIANGLES, playerIndexCount, gl.UNSIGNED_SHORT, 0);
+
+        // Draw ghosts (blue)
         const ghostList = getGhosts();
         if (ghostList.length > 0) {
-            gl.enable(gl.BLEND);
-            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
             gl.bindBuffer(gl.ARRAY_BUFFER, ghostPosBuf);
             gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
             gl.bindBuffer(gl.ARRAY_BUFFER, ghostColBuf);
@@ -198,17 +236,15 @@ function main() {
                     gl.drawElements(gl.TRIANGLES, ghostIndexCount, gl.UNSIGNED_SHORT, 0);
                 }
             }
-
-            gl.disable(gl.BLEND);
         }
+
+        gl.disable(gl.BLEND);
 
         requestAnimationFrame(render);
     }
 
-    // Handle pointer lock state changes
-    document.addEventListener('pointerlockchange', () => {
-        setTimeLoopRunning(isPlayerActive());
-    });
+    // Start time loop when game becomes active
+    setTimeLoopRunning(true);
 
     render(performance.now());
 }
