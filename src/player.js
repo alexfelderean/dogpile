@@ -186,37 +186,34 @@ function hasPlayerInput() {
            Math.abs(joystick.vector.x) > 0.1 || Math.abs(joystick.vector.y) > 0.1;
 }
 
-// Update player position based on input (world-relative for isometric)
+// Update player position based on input (isometric-aligned movement)
 function updatePlayer() {
     if (!isPlayerActive()) return false;
 
     const speed = player.speed;
 
-    let moveX = 0;
-    let moveZ = 0;
+    let moveFwd = 0;  // Forward/back in screen space
+    let moveRight = 0; // Left/right in screen space
 
-    // Keyboard - world-relative movement
-    // In isometric view: W/Up = -Z (away), S/Down = +Z (toward)
-    //                    A/Left = -X (left), D/Right = +X (right)
-    if (keys['KeyW'] || keys['ArrowUp']) moveZ -= 1;
-    if (keys['KeyS'] || keys['ArrowDown']) moveZ += 1;
-    if (keys['KeyA'] || keys['ArrowLeft']) moveX -= 1;
-    if (keys['KeyD'] || keys['ArrowRight']) moveX += 1;
+    // Keyboard - isometric-aligned movement
+    // W = toward back corner, S = toward front corner
+    // A = toward left corner, D = toward right corner
+    if (keys['KeyW'] || keys['ArrowUp']) moveFwd += 1;
+    if (keys['KeyS'] || keys['ArrowDown']) moveFwd -= 1;
+    if (keys['KeyA'] || keys['ArrowLeft']) moveRight -= 1;
+    if (keys['KeyD'] || keys['ArrowRight']) moveRight += 1;
 
-    // Joystick - world-relative
-    // joystick.vector.x = left/right = X axis
-    // joystick.vector.y = up/down = Z axis (up screen = -Z)
-    moveX += joystick.vector.x;
-    moveZ += joystick.vector.y;
+    // Joystick - isometric-aligned
+    moveRight += joystick.vector.x;
+    moveFwd -= joystick.vector.y; // Invert Y for natural control
 
-    if (moveX === 0 && moveZ === 0) return false;
+    if (moveFwd === 0 && moveRight === 0) return false;
 
-    // Normalize diagonal movement
-    const len = Math.sqrt(moveX * moveX + moveZ * moveZ);
-    if (len > 1) {
-        moveX /= len;
-        moveZ /= len;
-    }
+    // Convert isometric screen space to world space (45-degree rotation)
+    // W (forward) should go toward back corner, S (back) toward front corner
+    // D (right) should go toward right corner, A (left) toward left corner
+    const moveX = (moveRight + moveFwd) * 0.7071; // cos(45°) ≈ 0.7071
+    const moveZ = (moveRight - moveFwd) * 0.7071;
 
     // Apply movement
     player.position[0] += moveX * speed;
