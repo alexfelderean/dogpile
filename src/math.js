@@ -30,17 +30,17 @@ function mat4IsometricView(out) {
     // Isometric angles: 45° Y rotation, ~35.264° X tilt (arctan(1/sqrt(2)))
     const yaw = Math.PI / 4;      // 45 degrees
     const pitch = Math.atan(1 / Math.sqrt(2)); // ~35.264 degrees
-    
+
     const cy = Math.cos(yaw), sy = Math.sin(yaw);
     const cp = Math.cos(pitch), sp = Math.sin(pitch);
-    
+
     // Combined rotation matrix (pitch * yaw) then translate back
     const dist = 80; // Camera distance from origin (increased to avoid clipping)
-    
-    out[0] = cy;      out[1] = sy * sp;     out[2] = -sy * cp;    out[3] = 0;
-    out[4] = 0;       out[5] = cp;          out[6] = sp;          out[7] = 0;
-    out[8] = sy;      out[9] = -cy * sp;    out[10] = cy * cp;    out[11] = 0;
-    out[12] = 0;      out[13] = 0;          out[14] = -dist;      out[15] = 1;
+
+    out[0] = cy; out[1] = sy * sp; out[2] = -sy * cp; out[3] = 0;
+    out[4] = 0; out[5] = cp; out[6] = sp; out[7] = 0;
+    out[8] = sy; out[9] = -cy * sp; out[10] = cy * cp; out[11] = 0;
+    out[12] = 0; out[13] = 0; out[14] = -dist; out[15] = 1;
 }
 
 function mat4Identity(out) {
@@ -82,7 +82,7 @@ function mat4RotateY(out, rad) {
 function calculateIsometricFitBounds(roomSize, roomHeight, marginPercent = 0.15) {
     // Room bounds in world space (centered at origin)
     const halfSize = roomSize / 2;
-    
+
     // 8 corners of the room box
     const corners = [
         [-halfSize, 0, -halfSize],
@@ -94,34 +94,34 @@ function calculateIsometricFitBounds(roomSize, roomHeight, marginPercent = 0.15)
         [halfSize, roomHeight, halfSize],
         [-halfSize, roomHeight, halfSize]
     ];
-    
+
     // Transform each corner through the isometric view
     const yaw = Math.PI / 4;
     const pitch = Math.atan(1 / Math.sqrt(2));
     const cy = Math.cos(yaw), sy = Math.sin(yaw);
     const cp = Math.cos(pitch), sp = Math.sin(pitch);
-    
+
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
-    
+
     for (const [x, y, z] of corners) {
         // Apply rotation (same as in mat4IsometricView)
         const tx = cy * x + sy * z;
         const ty = sy * sp * x + cp * y - cy * sp * z;
-        
+
         minX = Math.min(minX, tx);
         maxX = Math.max(maxX, tx);
         minY = Math.min(minY, ty);
         maxY = Math.max(maxY, ty);
     }
-    
+
     // Calculate the span needed
     const spanX = maxX - minX;
     const spanY = maxY - minY;
-    
+
     // Add margin
     const margin = 1 + marginPercent;
-    
+
     return {
         spanX: spanX * margin,
         spanY: spanY * margin,

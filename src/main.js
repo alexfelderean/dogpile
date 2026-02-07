@@ -4,21 +4,47 @@
 // Shader Sources
 const vsSource = `
   attribute vec4 aPosition;
+  attribute vec3 aNormal;
   attribute vec4 aColor;
   uniform mat4 uModelMatrix;
   uniform mat4 uViewMatrix;
   uniform mat4 uProjectionMatrix;
   varying lowp vec4 vColor;
+  varying highp vec3 vNormal;
+  varying highp vec3 vWorldPos;
   void main() {
-    gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * aPosition;
+    vec4 worldPos = uModelMatrix * aPosition;
+    gl_Position = uProjectionMatrix * uViewMatrix * worldPos;
     vColor = aColor;
+    // Transform normal to world space (for uniform scale, this works)
+    vNormal = mat3(uModelMatrix) * aNormal;
+    vWorldPos = worldPos.xyz;
   }
 `;
 
 const fsSource = `
+  precision highp float;
   varying lowp vec4 vColor;
+  varying highp vec3 vNormal;
+  varying highp vec3 vWorldPos;
+  uniform vec3 uLightDir;
+  uniform vec3 uAmbientColor;
+  uniform vec3 uLightColor;
+  
   void main() {
-    gl_FragColor = vColor;
+    // Normalize interpolated normal
+    vec3 normal = normalize(vNormal);
+    
+    // Diffuse lighting
+    float diff = max(dot(normal, uLightDir), 0.0);
+    
+    // Combine ambient and diffuse
+    vec3 ambient = uAmbientColor * vColor.rgb;
+    vec3 diffuse = uLightColor * diff * vColor.rgb;
+    
+    vec3 finalColor = ambient + diffuse;
+    
+    gl_FragColor = vec4(finalColor, vColor.a);
   }
 `;
 
@@ -87,6 +113,10 @@ function main() {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, room.indices, gl.STATIC_DRAW);
 
+    const normBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, normBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, room.normals, gl.STATIC_DRAW);
+
     // Ghost buffers
     const ghostPosBuf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, ghostPosBuf);
@@ -99,6 +129,10 @@ function main() {
     const ghostIdxBuf = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ghostIdxBuf);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, ghostGeom.indices, gl.STATIC_DRAW);
+
+    const ghostNormBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, ghostNormBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, ghostGeom.normals, gl.STATIC_DRAW);
 
     // Player buffers
     const playerPosBuf = gl.createBuffer();
@@ -113,12 +147,20 @@ function main() {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerIdxBuf);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, playerGeom.indices, gl.STATIC_DRAW);
 
+    const playerNormBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, playerNormBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, playerGeom.normals, gl.STATIC_DRAW);
+
     // Attribute & uniform locations
     const aPosition = gl.getAttribLocation(program, 'aPosition');
+    const aNormal = gl.getAttribLocation(program, 'aNormal');
     const aColor = gl.getAttribLocation(program, 'aColor');
     const uModelMatrix = gl.getUniformLocation(program, 'uModelMatrix');
     const uViewMatrix = gl.getUniformLocation(program, 'uViewMatrix');
     const uProjection = gl.getUniformLocation(program, 'uProjectionMatrix');
+    const uLightDir = gl.getUniformLocation(program, 'uLightDir');
+    const uAmbientColor = gl.getUniformLocation(program, 'uAmbientColor');
+    const uLightColor = gl.getUniformLocation(program, 'uLightColor');
 
     // Identity matrix for room
     const identityMatrix = new Float32Array(16);
@@ -134,7 +176,16 @@ function main() {
     gl.useProgram(program);
 
     gl.enableVertexAttribArray(aPosition);
+    gl.enableVertexAttribArray(aNormal);
     gl.enableVertexAttribArray(aColor);
+
+    // Set up lighting - light coming from upper-left-front (isometric friendly)
+    // Normalized direction vector pointing FROM light TO scene
+    const lightDirX = 0.5, lightDirY = 0.7, lightDirZ = 0.5;
+    const lightLen = Math.sqrt(lightDirX * lightDirX + lightDirY * lightDirY + lightDirZ * lightDirZ);
+    gl.uniform3f(uLightDir, lightDirX / lightLen, lightDirY / lightLen, lightDirZ / lightLen);
+    gl.uniform3f(uAmbientColor, 0.5, 0.5, 0.55);  // Brighter ambient
+    gl.uniform3f(uLightColor, 0.6, 0.58, 0.5);   // Warm directional light
 
     const indexCount = room.indexCount;
     const ghostIndexCount = ghostGeom.indexCount;
@@ -225,6 +276,8 @@ function main() {
         gl.uniformMatrix4fv(uModelMatrix, false, identityMatrix);
         gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
         gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, normBuf);
+        gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ARRAY_BUFFER, colBuf);
         gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
@@ -238,6 +291,8 @@ function main() {
         const playerPos = getPlayerPosition();
         gl.bindBuffer(gl.ARRAY_BUFFER, playerPosBuf);
         gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, playerNormBuf);
+        gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ARRAY_BUFFER, playerColBuf);
         gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerIdxBuf);
@@ -250,6 +305,8 @@ function main() {
         if (ghostList.length > 0) {
             gl.bindBuffer(gl.ARRAY_BUFFER, ghostPosBuf);
             gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, ghostNormBuf);
+            gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
             gl.bindBuffer(gl.ARRAY_BUFFER, ghostColBuf);
             gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ghostIdxBuf);
