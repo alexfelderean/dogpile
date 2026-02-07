@@ -8,8 +8,15 @@ const player = {
     velocityY: 0,
     isJumping: false,
     jumpForce: 0.25,
-    gravity: 0.015
+    gravity: 0.015,
+    yaw: 0  // Facing direction (radians), locked to 4 cardinal directions
 };
+
+// Cardinal direction yaw values (in radians)
+const DIR_POS_Z = 0;              // Facing +Z (toward camera in isometric)
+const DIR_POS_X = -Math.PI / 2;   // Facing +X (right in isometric)
+const DIR_NEG_Z = Math.PI;        // Facing -Z (away from camera)
+const DIR_NEG_X = Math.PI / 2;    // Facing -X (left in isometric)
 
 // Room bounds for collision (9x9 grid * 2 cell size = 18 units wide, half = 9, with margin)
 const ROOM_HALF_SIZE = 8.7;
@@ -53,6 +60,11 @@ function resetPlayer() {
 // Get player position for rendering
 function getPlayerPosition() {
     return player.position;
+}
+
+// Get player yaw for rendering
+function getPlayerYaw() {
+    return player.yaw;
 }
 
 // Setup keyboard and mouse input
@@ -229,6 +241,19 @@ function updatePlayer() {
         // Apply movement
         player.position[0] += moveX * speed;
         player.position[2] += moveZ * speed;
+
+        // Update facing direction based on dominant movement axis
+        const absMoveX = Math.abs(moveX);
+        const absMoveZ = Math.abs(moveZ);
+
+        if (absMoveX > absMoveZ) {
+            // Moving more in X direction
+            player.yaw = moveX > 0 ? DIR_POS_X : DIR_NEG_X;
+        } else if (absMoveZ > absMoveX) {
+            // Moving more in Z direction
+            player.yaw = moveZ > 0 ? DIR_POS_Z : DIR_NEG_Z;
+        }
+        // If equal, keep current facing direction
     }
 
     // Handle jumping (always check, regardless of movement)
@@ -271,7 +296,7 @@ function getPlayerState() {
         x: player.position[0],
         y: player.position[1],
         z: player.position[2],
-        yaw: 0,   // No rotation in isometric
+        yaw: player.yaw,   // Current facing direction
         pitch: 0
     };
 }

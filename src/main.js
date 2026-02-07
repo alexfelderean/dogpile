@@ -496,7 +496,7 @@ async function main() {
         gl.uniform1i(uTexture, 0);
         gl.uniform1i(uUseTexture, 1);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, playerIdxBuf);
-        getGhostModelMatrix(characterModelMatrix, playerPos[0], playerPos[1], playerPos[2], 0);
+        getGhostModelMatrix(characterModelMatrix, playerPos[0], playerPos[1], playerPos[2], getPlayerYaw());
         // Apply transition to player
         characterModelMatrix[13] += levelTransitionY;
         gl.uniformMatrix4fv(uModelMatrix, false, characterModelMatrix);
