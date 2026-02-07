@@ -142,9 +142,63 @@ function createRoomGeometry() {
     );
 
     // --- GRID OBJECTS ---
-    // Cubes fill the entire grid cell
     const cubeSize = CELL_SIZE;
     const cubeHeight = CELL_SIZE;
+
+    // Helper to add a floating 2D arrow rotated 45° on diagonal plane pointing down
+    function addArrow(cx, cz, color) {
+        const size = CELL_SIZE * 0.6;  // Arrow size
+        const floatHeight = 1.5;  // Height arrow floats at
+
+        // Arrow dimensions
+        const headLength = size * 0.4;  // Arrow head height
+        const headWidth = size * 0.5;   // Arrow head width
+        const tailWidth = size * 0.15;  // Tail thickness
+        const tailLength = size * 0.5;  // Tail height
+
+        const tipY = floatHeight - size / 2;
+        const headBaseY = tipY + headLength;
+        const tailTopY = headBaseY + tailLength;
+
+        // 45 degree rotation: offset in X and Z equally
+        const cos45 = 0.7071;  // cos(45°)
+        const sin45 = 0.7071;  // sin(45°)
+
+        // Helper to rotate a point around Y axis by 45 degrees
+        function rot(dx, dz) {
+            return [dx * cos45 - dz * sin45, dx * sin45 + dz * cos45];
+        }
+
+        // Arrow head triangle (pointing down)
+        const [hx1, hz1] = rot(-headWidth / 2, 0);
+        const [hx2, hz2] = rot(headWidth / 2, 0);
+
+        positions.push(
+            cx, tipY, cz,                           // Tip (bottom)
+            cx + hx1, headBaseY, cz + hz1,          // Left
+            cx + hx2, headBaseY, cz + hz2           // Right
+        );
+        for (let i = 0; i < 3; i++) colors.push(...color);
+        indices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2);
+        vertexOffset += 3;
+
+        // Arrow tail rectangle
+        const [tx1, tz1] = rot(-tailWidth / 2, 0);
+        const [tx2, tz2] = rot(tailWidth / 2, 0);
+
+        positions.push(
+            cx + tx1, headBaseY, cz + tz1,  // Bottom left
+            cx + tx2, headBaseY, cz + tz2,  // Bottom right
+            cx + tx2, tailTopY, cz + tz2,   // Top right
+            cx + tx1, tailTopY, cz + tz1    // Top left
+        );
+        for (let i = 0; i < 4; i++) colors.push(...color);
+        indices.push(
+            vertexOffset, vertexOffset + 1, vertexOffset + 2,
+            vertexOffset, vertexOffset + 2, vertexOffset + 3
+        );
+        vertexOffset += 4;
+    }
 
     for (let row = 0; row < GRID_SIZE; row++) {
         for (let col = 0; col < GRID_SIZE; col++) {
@@ -154,16 +208,21 @@ function createRoomGeometry() {
             const [worldX, worldZ] = gridToWorld(row, col);
             const color = OBJECT_COLORS[objectType] || [0.5, 0.5, 0.5, 1.0];
 
-            // Add a cube at this grid position
-            addBox(
-                worldX - cubeSize / 2,
-                0,
-                worldZ - cubeSize / 2,
-                cubeSize,
-                cubeHeight,
-                cubeSize,
-                color
-            );
+            if (objectType === 1) {
+                // Type 1: Downward-pointing arrow on floor
+                addArrow(worldX, worldZ, color);
+            } else {
+                // Other types: Regular cube
+                addBox(
+                    worldX - cubeSize / 2,
+                    0,
+                    worldZ - cubeSize / 2,
+                    cubeSize,
+                    cubeHeight,
+                    cubeSize,
+                    color
+                );
+            }
         }
     }
 
