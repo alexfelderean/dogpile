@@ -47,7 +47,8 @@ export async function loadLevel(levelPath) {
                 doorRow = row; doorCol = col; doorChannel = channel;
                 levelGrid[row][col] = 0;
             } else if (mechType === 1) {
-                createPiston(row, col, channel);
+                const height = levelHeight[row] ? levelHeight[row][col] : 0;
+                createPiston(row, col, channel, height);
                 levelGrid[row][col] = 4;
             }
         } else if (entityByte === 32) levelGrid[row][col] = 1;

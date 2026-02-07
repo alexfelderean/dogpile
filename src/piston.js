@@ -1,17 +1,19 @@
 import { player } from './player.js';
 import { isChannelActive } from './pressureplate.js';
 import { aabbCollision } from './math.js';
+import { getLevelCellSize } from './room.js';
 
 const pistons = [];
 const PISTON_MIN_HEIGHT = 0.5;
 const PISTON_MAX_HEIGHT = 2;
 const PISTON_EXTEND_SPEED = 0.15; // Height units per frame
 
-export function createPiston(gridRow, gridCol, channel) {
+export function createPiston(gridRow, gridCol, channel, baseHeight = 0) {
     const GRID_SIZE = 9, CELL_SIZE = 2;
     const piston = {
         gridRow, gridCol, channel, isExtended: false, wasExtended: false,
         currentHeight: PISTON_MIN_HEIGHT,
+        baseY: baseHeight * CELL_SIZE, // Store base Y position for elevated pistons
         worldX: (gridCol - GRID_SIZE / 2 + 0.5) * CELL_SIZE,
         worldZ: (gridRow - GRID_SIZE / 2 + 0.5) * CELL_SIZE,
         update() {
@@ -61,7 +63,7 @@ export function handlePistonCollisions() {
         if (!piston.isExtended) continue;
         const result = aabbCollision(
             player.position[0], player.position[1], player.position[2],
-            playerRadius, piston.worldX, piston.worldZ, CELL_SIZE / 2, piston.getHeight(), player
+            playerRadius, piston.worldX, piston.worldZ, CELL_SIZE / 2, piston.getHeight(), player, piston.baseY
         );
         if (result) {
             if (result.type === 'top') {
