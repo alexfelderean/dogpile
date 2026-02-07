@@ -91,6 +91,8 @@ async function main() {
         gl.bufferData(gl.ARRAY_BUFFER, room.colors, gl.STATIC_DRAW);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, room.indices, gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, normBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, room.normals, gl.STATIC_DRAW);
     }
     window.rebuildRoomGeometry = updateRoomBuffers;
     window.refreshRoomBuffers = refreshRoomBuffers;
