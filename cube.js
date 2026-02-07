@@ -2,11 +2,12 @@
 const vsSource = `
   attribute vec4 aPosition;
   attribute vec4 aColor;
+  uniform mat4 uModelMatrix;
   uniform mat4 uViewMatrix;
   uniform mat4 uProjectionMatrix;
   varying lowp vec4 vColor;
   void main() {
-    gl_Position = uProjectionMatrix * uViewMatrix * aPosition;
+    gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * aPosition;
     vColor = aColor;
   }
 `;
@@ -76,6 +77,96 @@ const camera = {
     sensitivity: 0.002
 };
 
+// --- Time Loop System ---
+const timeLoop = {
+    duration: 3,            // Loop duration in seconds
+    startTime: 0,
+    isRunning: false,
+    recordInterval: 1000 / 60, // ~60Hz recording
+    lastRecordTime: 0
+};
+
+// --- Ghost System ---
+const MAX_GHOSTS = 8;
+const ghosts = [];          // Array of ghost recordings
+let currentRecording = [];  // Current life's input recording
+
+function resetLoop() {
+    // Save current recording as a ghost (if we have data)
+    if (currentRecording.length > 0) {
+        ghosts.push({
+            frames: currentRecording,
+            currentFrame: 0
+        });
+        // Phase out oldest ghost if we exceed max
+        if (ghosts.length > MAX_GHOSTS) {
+            ghosts.shift();
+        }
+        updateGhostCountUI();
+    }
+    
+    // Reset recording
+    currentRecording = [];
+    
+    // Reset player position
+    camera.position[0] = 0;
+    camera.position[1] = 1.6;
+    camera.position[2] = 0;
+    camera.yaw = 0;
+    camera.pitch = 0;
+    
+    // Reset ghost playback positions
+    for (const ghost of ghosts) {
+        ghost.currentFrame = 0;
+    }
+    
+    // Restart timer
+    timeLoop.startTime = performance.now();
+    timeLoop.lastRecordTime = 0;
+}
+
+function recordFrame(timestamp) {
+    if (!timeLoop.isRunning) return;
+    
+    // Record at ~60Hz
+    if (timestamp - timeLoop.lastRecordTime >= timeLoop.recordInterval) {
+        currentRecording.push({
+            x: camera.position[0],
+            y: camera.position[1],
+            z: camera.position[2],
+            yaw: camera.yaw,
+            pitch: camera.pitch
+        });
+        timeLoop.lastRecordTime = timestamp;
+    }
+}
+
+function updateGhosts() {
+    for (const ghost of ghosts) {
+        if (ghost.currentFrame < ghost.frames.length) {
+            ghost.currentFrame++;
+        }
+    }
+}
+
+function updateTimerUI(elapsed) {
+    const timerFill = document.getElementById('timer-fill');
+    const remaining = Math.max(0, 1 - elapsed / timeLoop.duration);
+    timerFill.style.width = (remaining * 100) + '%';
+    
+    // Warning color when < 25% time left
+    if (remaining < 0.25) {
+        timerFill.classList.add('warning');
+    } else {
+        timerFill.classList.remove('warning');
+    }
+}
+
+function updateGhostCountUI() {
+    const ghostCountEl = document.getElementById('ghost-count');
+    ghostCountEl.textContent = `Ghosts: ${ghosts.length}/${MAX_GHOSTS}`;
+}
+
 // Build camera view matrix into pre-allocated array
 function getCameraViewMatrix(out) {
     mat4Identity(out);
@@ -129,6 +220,21 @@ function setupInput(canvas) {
         isPointerLocked = document.pointerLockElement === canvas;
         overlay.classList.toggle('hidden', isPointerLocked);
         crosshair.classList.toggle('hidden', !isPointerLocked);
+        
+        const timerBar = document.getElementById('timer-bar');
+        const ghostCount = document.getElementById('ghost-count');
+        timerBar.classList.toggle('hidden', !isPointerLocked);
+        ghostCount.classList.toggle('hidden', !isPointerLocked);
+        
+        // Start/stop the time loop
+        if (isPointerLocked) {
+            timeLoop.isRunning = true;
+            timeLoop.startTime = performance.now();
+            timeLoop.lastRecordTime = 0;
+            updateGhostCountUI();
+        } else {
+            timeLoop.isRunning = false;
+        }
     });
 }
 
@@ -273,32 +379,48 @@ function createRoomGeometry() {
         [0.2, 0.8, 0.6, 1.0]
     );
 
-    // Door frame (darker)
-    const frameWidth = 0.08;
-    // Left frame
-    addQuad(
-        [size - doorInset + 0.01, 0, 1],
-        [size - doorInset + 0.01, 2.2, 1],
-        [size - doorInset + 0.01, 2.2, 1 + frameWidth],
-        [size - doorInset + 0.01, 0, 1 + frameWidth],
-        [0.1, 0.1, 0.12, 1.0]
-    );
-    // Right frame
-    addQuad(
-        [size - doorInset + 0.01, 0, -1 - frameWidth],
-        [size - doorInset + 0.01, 2.2, -1 - frameWidth],
-        [size - doorInset + 0.01, 2.2, -1],
-        [size - doorInset + 0.01, 0, -1],
-        [0.1, 0.1, 0.12, 1.0]
-    );
-    // Top frame
-    addQuad(
-        [size - doorInset + 0.01, 2.2, -1],
-        [size - doorInset + 0.01, 2.2 + frameWidth, -1],
-        [size - doorInset + 0.01, 2.2 + frameWidth, 1],
-        [size - doorInset + 0.01, 2.2, 1],
-        [0.1, 0.1, 0.12, 1.0]
-    );
+    return {
+        positions: new Float32Array(positions),
+        colors: new Float32Array(colors),
+        indices: new Uint16Array(indices),
+        indexCount: indices.length
+    };
+}
+
+// --- Ghost Geometry ---
+function createGhostGeometry() {
+    // Simple diamond/capsule shape for ghosts
+    const positions = [];
+    const colors = [];
+    const indices = [];
+    let vertexOffset = 0;
+
+    function addQuad(p1, p2, p3, p4, color) {
+        positions.push(...p1, ...p2, ...p3, ...p4);
+        for (let i = 0; i < 4; i++) {
+            colors.push(...color);
+        }
+        indices.push(
+            vertexOffset, vertexOffset + 1, vertexOffset + 2,
+            vertexOffset, vertexOffset + 2, vertexOffset + 3
+        );
+        vertexOffset += 4;
+    }
+
+    // Ghost body - simple box (0.3 wide, 1.6 tall, 0.3 deep)
+    const w = 0.15, h = 0.8, d = 0.15;
+    const ghostColor = [0.4, 0.6, 0.9, 0.7]; // Translucent blue
+
+    // Front
+    addQuad([-w, 0, d], [w, 0, d], [w, h*2, d], [-w, h*2, d], ghostColor);
+    // Back
+    addQuad([w, 0, -d], [-w, 0, -d], [-w, h*2, -d], [w, h*2, -d], ghostColor);
+    // Left
+    addQuad([-w, 0, -d], [-w, 0, d], [-w, h*2, d], [-w, h*2, -d], ghostColor);
+    // Right
+    addQuad([w, 0, d], [w, 0, -d], [w, h*2, -d], [w, h*2, d], ghostColor);
+    // Top
+    addQuad([-w, h*2, d], [w, h*2, d], [w, h*2, -d], [-w, h*2, -d], ghostColor);
 
     return {
         positions: new Float32Array(positions),
@@ -306,6 +428,18 @@ function createRoomGeometry() {
         indices: new Uint16Array(indices),
         indexCount: indices.length
     };
+}
+
+// --- Ghost Model Matrix ---
+const _ghostModelMatrix = new Float32Array(16);
+
+function getGhostModelMatrix(out, x, y, z, yaw) {
+    // Simple translation + Y rotation matrix
+    const c = Math.cos(yaw), s = Math.sin(yaw);
+    out[0] = c;  out[1] = 0; out[2] = s;  out[3] = 0;
+    out[4] = 0;  out[5] = 1; out[6] = 0;  out[7] = 0;
+    out[8] = -s; out[9] = 0; out[10] = c; out[11] = 0;
+    out[12] = x; out[13] = y; out[14] = z; out[15] = 1;
 }
 
 // --- Main ---
@@ -359,6 +493,7 @@ function main() {
 
     // Create room geometry
     const room = createRoomGeometry();
+    const ghostGeom = createGhostGeometry();
 
     // Create buffers
     const posBuf = gl.createBuffer();
@@ -376,8 +511,28 @@ function main() {
     // Attribute & uniform locations
     const aPosition = gl.getAttribLocation(program, 'aPosition');
     const aColor = gl.getAttribLocation(program, 'aColor');
+    const uModelMatrix = gl.getUniformLocation(program, 'uModelMatrix');
     const uViewMatrix = gl.getUniformLocation(program, 'uViewMatrix');
     const uProjection = gl.getUniformLocation(program, 'uProjectionMatrix');
+
+    // Identity matrix for room (static geometry)
+    const identityMatrix = new Float32Array(16);
+    mat4Identity(identityMatrix);
+
+    // Ghost buffers
+    const ghostPosBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, ghostPosBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, ghostGeom.positions, gl.STATIC_DRAW);
+
+    const ghostColBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, ghostColBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, ghostGeom.colors, gl.STATIC_DRAW);
+
+    const ghostIdxBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ghostIdxBuf);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, ghostGeom.indices, gl.STATIC_DRAW);
+
+    const ghostIndexCount = ghostGeom.indexCount;
 
     // Enable depth testing
     gl.enable(gl.DEPTH_TEST);
@@ -406,7 +561,7 @@ function main() {
     // Cache index count
     const indexCount = room.indexCount;
 
-    function render() {
+    function render(timestamp) {
         // Only update projection if canvas size changed
         if (canvas.width !== lastWidth || canvas.height !== lastHeight) {
             lastWidth = canvas.width;
@@ -414,6 +569,23 @@ function main() {
             gl.viewport(0, 0, lastWidth, lastHeight);
             mat4Perspective(_projMatrix, 70 * Math.PI / 180, lastWidth / lastHeight, 0.1, 100.0);
             gl.uniformMatrix4fv(uProjection, false, _projMatrix);
+        }
+
+        // Time loop logic
+        if (timeLoop.isRunning) {
+            const elapsed = (timestamp - timeLoop.startTime) / 1000;
+            updateTimerUI(elapsed);
+            
+            // Record current frame
+            recordFrame(timestamp);
+            
+            // Update ghost playback
+            updateGhosts();
+            
+            // Check for loop reset
+            if (elapsed >= timeLoop.duration) {
+                resetLoop();
+            }
         }
 
         // Update camera based on input
@@ -425,12 +597,45 @@ function main() {
         getCameraViewMatrix(_viewMatrix);
         gl.uniformMatrix4fv(uViewMatrix, false, _viewMatrix);
 
+        // Draw room (with identity model matrix)
+        gl.uniformMatrix4fv(uModelMatrix, false, identityMatrix);
+        
+        gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+        gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, colBuf);
+        gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+        
         gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, 0);
+
+        // Draw ghosts
+        if (ghosts.length > 0) {
+            // Enable blending for translucent ghosts
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            
+            gl.bindBuffer(gl.ARRAY_BUFFER, ghostPosBuf);
+            gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, ghostColBuf);
+            gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ghostIdxBuf);
+            
+            for (const ghost of ghosts) {
+                if (ghost.currentFrame > 0 && ghost.currentFrame <= ghost.frames.length) {
+                    const frame = ghost.frames[ghost.currentFrame - 1];
+                    getGhostModelMatrix(_ghostModelMatrix, frame.x, 0, frame.z, frame.yaw);
+                    gl.uniformMatrix4fv(uModelMatrix, false, _ghostModelMatrix);
+                    gl.drawElements(gl.TRIANGLES, ghostIndexCount, gl.UNSIGNED_SHORT, 0);
+                }
+            }
+            
+            gl.disable(gl.BLEND);
+        }
 
         requestAnimationFrame(render);
     }
 
-    render();
+    render(performance.now());
 }
 
 main();

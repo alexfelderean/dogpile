@@ -90,6 +90,43 @@
             transform: translateY(-50%);
         }
 
+        #timer-bar {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 8px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            z-index: 5;
+            overflow: hidden;
+        }
+
+        #timer-fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #4ecdc4, #44a08d);
+            transition: width 0.05s linear;
+            border-radius: 3px;
+        }
+
+        #timer-fill.warning {
+            background: linear-gradient(90deg, #f39c12, #e74c3c);
+        }
+
+        #ghost-count {
+            position: fixed;
+            top: 35px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.6);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 12px;
+            z-index: 5;
+        }
+
         .hidden {
             display: none !important;
         }
@@ -107,6 +144,10 @@
         </div>
     </div>
     <div id="crosshair" class="hidden"></div>
+    <div id="timer-bar" class="hidden">
+        <div id="timer-fill"></div>
+    </div>
+    <div id="ghost-count" class="hidden">Ghosts: 0/8</div>
     <canvas id="glCanvas"></canvas>
     <script src="cube.js"></script>
 </body>
