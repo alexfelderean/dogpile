@@ -2,7 +2,7 @@
 // PLAYER CHARACTER
 // =============================================================================
 // Camera/player state
-const player = {
+export const player = {
     position: [0, 0, 0],  // Ground level
     speed: 0.16,
     velocityY: 0,
@@ -39,24 +39,24 @@ const jumpButton = {
 let spawnPosition = null;
 
 // Set player spawn position
-function setPlayerSpawn(x, y, z) {
+export function setPlayerSpawn(x, y, z) {
     spawnPosition = [x, y, z];
 }
 
 // Reset player to starting position
-function resetPlayer() {
+export function resetPlayer() {
     player.position[0] = spawnPosition[0];
     player.position[1] = spawnPosition[1];
     player.position[2] = spawnPosition[2];
 }
 
 // Get player position for rendering
-function getPlayerPosition() {
+export function getPlayerPosition() {
     return player.position;
 }
 
 // Setup keyboard and mouse input
-function setupPlayerInput(canvas, onFirstInput) {
+export function setupPlayerInput(canvas, onFirstInput) {
     // Keyboard
     document.addEventListener('keydown', (e) => {
         keys[e.code] = true;
@@ -190,7 +190,7 @@ function setupPlayerInput(canvas, onFirstInput) {
 }
 
 // Check if player has any movement input
-function hasPlayerInput() {
+export function hasPlayerInput() {
     return keys['KeyW'] || keys['KeyS'] || keys['KeyA'] || keys['KeyD'] ||
         keys['ArrowUp'] || keys['ArrowDown'] || keys['ArrowLeft'] || keys['ArrowRight'] ||
         keys['Space'] || jumpButton.pressed ||
@@ -198,7 +198,7 @@ function hasPlayerInput() {
 }
 
 // Update player position based on input (isometric-aligned movement)
-function updatePlayer() {
+export function updatePlayer() {
     if (!isPlayerActive()) return false;
 
     const speed = player.speed;
@@ -255,7 +255,7 @@ function updatePlayer() {
 }
 
 // Clamp player position to room bounds (accounting for player cube size)
-function clampPlayerToRoom() {
+export function clampPlayerToRoom() {
     const playerHalf = 0.7;  // Half of player cube size (1.4 / 2)
     const maxPos = ROOM_HALF_SIZE - playerHalf;
 
@@ -266,7 +266,7 @@ function clampPlayerToRoom() {
 }
 
 // Get current player state for recording
-function getPlayerState() {
+export function getPlayerState() {
     return {
         x: player.position[0],
         y: player.position[1],
@@ -277,6 +277,6 @@ function getPlayerState() {
 }
 
 // Check if game is active
-function isPlayerActive() {
+export function isPlayerActive() {
     return gameActive;
 }

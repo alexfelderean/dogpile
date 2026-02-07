@@ -1,52 +1,18 @@
+import { mat4Identity, mat4IsometricView, mat4Orthographic, calculateIsometricFitBounds, _viewMatrix, _projMatrix } from './math.js';
+import { loadLevel, createRoomGeometry, createArrowGeometry, updateDoorCollision, updateDoorLockState, handleLevelTileCollisions, setRoomCallbacks, getLevelGridSize, getLevelCellSize } from './room.js';
+import { player, setupPlayerInput, updatePlayer, hasPlayerInput, isPlayerActive, getPlayerPosition } from './player.js';
+import { createGhostGeometry, getGhosts, getGhostModelMatrix, getGhostFrame, getGhostModelMatrixForFrame, createPlayerGeometry, handleGhostCollisions, startTimeLoop, updateTimeLoop, setTimeLoopRunning, isWaitingForInput } from './ghost.js';
+import { updatePressurePlates } from './pressureplate.js';
+import { recordFrame } from './ghost.js'; // imported separately just to be sure
+import { updatePistons, handlePistonCollisions } from './piston.js';
+
 // =============================================================================
 // MAIN ENTRY POINT
 // =============================================================================
-// Shader Sources
-const vsSource = `
-  attribute vec4 aPosition;
-  attribute vec3 aNormal;
-  attribute vec4 aColor;
-  uniform mat4 uModelMatrix;
-  uniform mat4 uViewMatrix;
-  uniform mat4 uProjectionMatrix;
-  varying lowp vec4 vColor;
-  varying highp vec3 vNormal;
-  varying highp vec3 vWorldPos;
-  void main() {
-    vec4 worldPos = uModelMatrix * aPosition;
-    gl_Position = uProjectionMatrix * uViewMatrix * worldPos;
-    vColor = aColor;
-    // Transform normal to world space (for uniform scale, this works)
-    vNormal = mat3(uModelMatrix) * aNormal;
-    vWorldPos = worldPos.xyz;
-  }
-`;
+// Shader Sources (minified)
+const vsSource = `attribute vec4 aPosition;attribute vec3 aNormal;attribute vec4 aColor;uniform mat4 uModelMatrix;uniform mat4 uViewMatrix;uniform mat4 uProjectionMatrix;varying lowp vec4 vColor;varying highp vec3 vNormal;varying highp vec3 vWorldPos;void main(){vec4 worldPos=uModelMatrix*aPosition;gl_Position=uProjectionMatrix*uViewMatrix*worldPos;vColor=aColor;vNormal=mat3(uModelMatrix)*aNormal;vWorldPos=worldPos.xyz;}`;
 
-const fsSource = `
-  precision highp float;
-  varying lowp vec4 vColor;
-  varying highp vec3 vNormal;
-  varying highp vec3 vWorldPos;
-  uniform vec3 uLightDir;
-  uniform vec3 uAmbientColor;
-  uniform vec3 uLightColor;
-  
-  void main() {
-    // Normalize interpolated normal
-    vec3 normal = normalize(vNormal);
-    
-    // Diffuse lighting
-    float diff = max(dot(normal, uLightDir), 0.0);
-    
-    // Combine ambient and diffuse
-    vec3 ambient = uAmbientColor * vColor.rgb;
-    vec3 diffuse = uLightColor * diff * vColor.rgb;
-    
-    vec3 finalColor = ambient + diffuse;
-    
-    gl_FragColor = vec4(finalColor, vColor.a);
-  }
-`;
+const fsSource = `precision highp float;varying lowp vec4 vColor;varying highp vec3 vNormal;varying highp vec3 vWorldPos;uniform vec3 uLightDir;uniform vec3 uAmbientColor;uniform vec3 uLightColor;void main(){vec3 normal=normalize(vNormal);float diff=max(dot(normal,uLightDir),0.0);vec3 ambient=uAmbientColor*vColor.rgb;vec3 diffuse=uLightColor*diff*vColor.rgb;vec3 finalColor=ambient+diffuse;gl_FragColor=vec4(finalColor,vColor.a);}`;
 
 // =============================================================================
 // GAME INITIALIZATION
@@ -125,7 +91,7 @@ async function main() {
         transitionCallback = callback;
         transitionVelocity = 0.2; // Start slow
     }
-    window.transitionLevelOut = transitionLevelOut;
+    // window.transitionLevelOut = transitionLevelOut; // Removed global export
 
     // Function to update room buffers (called when level changes)
     function updateRoomBuffers() {
@@ -185,11 +151,18 @@ async function main() {
         // No transition reset - just update visuals
     }
 
-    // Make rebuildRoom available globally for level transitions
-    window.rebuildRoomGeometry = updateRoomBuffers;
+    // Register callbacks with room system
+    setRoomCallbacks({
+        rebuildGeometry: updateRoomBuffers,
+        refreshBuffers: refreshRoomBuffers,
+        transitionOut: transitionLevelOut
+    });
 
-    // Make refresh available for door state changes
-    window.refreshRoomBuffers = refreshRoomBuffers;
+    // Make rebuildRoom available globally for level transitions (Legacy cleanup)
+    // window.rebuildRoomGeometry = updateRoomBuffers;
+
+    // Make refresh available for door state changes (Legacy cleanup)
+    // window.refreshRoomBuffers = refreshRoomBuffers;
 
     // Initial buffer upload
     gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
@@ -347,8 +320,11 @@ async function main() {
 
             // Calculate proper bounds to fit isometric room
             const aspect = lastWidth / lastHeight;
-            const roomSize = GRID_SIZE * CELL_SIZE; // 18 units
-            const bounds = calculateIsometricFitBounds(roomSize, ROOM_HEIGHT, 0.15);
+            const gridSize = getLevelGridSize();
+            const cellSize = getLevelCellSize();
+            const roomSize = gridSize * cellSize; // 18 units
+            const roomHeight = roomSize; // ROOM_HEIGHT equals roomSize in room.js
+            const bounds = calculateIsometricFitBounds(roomSize, roomHeight, 0.15);
 
             // Determine view size based on aspect ratio
             // We want to fit the room with margin in both dimensions

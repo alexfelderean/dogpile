@@ -1,0 +1,155 @@
+{
+  "inputs": {
+    "src/math.js": {
+      "bytes": 5308,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/player.js": {
+      "bytes": 9406,
+      "imports": [],
+      "format": "esm"
+    },
+    "src/ghost.js": {
+      "bytes": 15412,
+      "imports": [
+        {
+          "path": "src/player.js",
+          "kind": "import-statement",
+          "original": "./player.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/pressureplate.js": {
+      "bytes": 4963,
+      "imports": [
+        {
+          "path": "src/player.js",
+          "kind": "import-statement",
+          "original": "./player.js"
+        },
+        {
+          "path": "src/ghost.js",
+          "kind": "import-statement",
+          "original": "./ghost.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/piston.js": {
+      "bytes": 5696,
+      "imports": [
+        {
+          "path": "src/player.js",
+          "kind": "import-statement",
+          "original": "./player.js"
+        },
+        {
+          "path": "src/pressureplate.js",
+          "kind": "import-statement",
+          "original": "./pressureplate.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/room.js": {
+      "bytes": 30487,
+      "imports": [
+        {
+          "path": "src/player.js",
+          "kind": "import-statement",
+          "original": "./player.js"
+        },
+        {
+          "path": "src/piston.js",
+          "kind": "import-statement",
+          "original": "./piston.js"
+        },
+        {
+          "path": "src/pressureplate.js",
+          "kind": "import-statement",
+          "original": "./pressureplate.js"
+        },
+        {
+          "path": "src/ghost.js",
+          "kind": "import-statement",
+          "original": "./ghost.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "src/main.js": {
+      "bytes": 20989,
+      "imports": [
+        {
+          "path": "src/math.js",
+          "kind": "import-statement",
+          "original": "./math.js"
+        },
+        {
+          "path": "src/room.js",
+          "kind": "import-statement",
+          "original": "./room.js"
+        },
+        {
+          "path": "src/player.js",
+          "kind": "import-statement",
+          "original": "./player.js"
+        },
+        {
+          "path": "src/ghost.js",
+          "kind": "import-statement",
+          "original": "./ghost.js"
+        },
+        {
+          "path": "src/pressureplate.js",
+          "kind": "import-statement",
+          "original": "./pressureplate.js"
+        },
+        {
+          "path": "src/ghost.js",
+          "kind": "import-statement",
+          "original": "./ghost.js"
+        },
+        {
+          "path": "src/piston.js",
+          "kind": "import-statement",
+          "original": "./piston.js"
+        }
+      ],
+      "format": "esm"
+    }
+  },
+  "outputs": {
+    "dist/bundle2.js": {
+      "imports": [],
+      "exports": [],
+      "entryPoint": "src/main.js",
+      "inputs": {
+        "src/math.js": {
+          "bytesInOutput": 1091
+        },
+        "src/player.js": {
+          "bytesInOutput": 3210
+        },
+        "src/ghost.js": {
+          "bytesInOutput": 4210
+        },
+        "src/pressureplate.js": {
+          "bytesInOutput": 1208
+        },
+        "src/piston.js": {
+          "bytesInOutput": 1437
+        },
+        "src/room.js": {
+          "bytesInOutput": 7001
+        },
+        "src/main.js": {
+          "bytesInOutput": 8125
+        }
+      },
+      "bytes": 26294
+    }
+  }
+}

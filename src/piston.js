@@ -1,3 +1,6 @@
+import { player } from './player.js';
+import { isChannelActive } from './pressureplate.js';
+
 // =============================================================================
 // PISTON MECHANISM SYSTEM
 // =============================================================================
@@ -48,19 +51,19 @@ class Piston {
 // =============================================================================
 
 // Create a piston and register it
-function createPiston(gridRow, gridCol, channel) {
+export function createPiston(gridRow, gridCol, channel) {
     const piston = new Piston(gridRow, gridCol, channel);
     pistons.push(piston);
     return piston;
 }
 
 // Clear all pistons (for level reset)
-function clearPistons() {
+export function clearPistons() {
     pistons.length = 0;
 }
 
 // Update all pistons
-function updatePistons() {
+export function updatePistons() {
     for (const piston of pistons) {
         piston.update();
 
@@ -75,12 +78,12 @@ function updatePistons() {
 }
 
 // Get all pistons
-function getPistons() {
+export function getPistons() {
     return pistons;
 }
 
 // Get piston at grid position
-function getPistonAt(gridRow, gridCol) {
+export function getPistonAt(gridRow, gridCol) {
     for (const piston of pistons) {
         if (piston.gridRow === gridRow && piston.gridCol === gridCol) {
             return piston;
@@ -92,7 +95,7 @@ function getPistonAt(gridRow, gridCol) {
 // =============================================================================
 // PISTON COLLISION
 // =============================================================================
-function handlePistonCollisions() {
+export function handlePistonCollisions() {
     const CELL_SIZE = 2;
     const playerRadius = 0.7;
     let standingOnPiston = false;

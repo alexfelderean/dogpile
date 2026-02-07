@@ -1,21 +1,21 @@
+import { player, setPlayerSpawn, resetPlayer } from './player.js';
+import { createPiston, clearPistons, getPistonAt } from './piston.js';
+import { createPressurePlate, clearPressurePlates, isChannelActive } from './pressureplate.js';
+import { clearGhosts } from './ghost.js';
+
 // =============================================================================
 // ROOM & LEVEL SYSTEM - Dynamic Level Loading
 // =============================================================================
 
-// Entity byte encoding:
-// 0 = empty
-// 1-15 = spawn location
-// 16-31 = pressure plate (channel = value & 0x0F)
-// 128+ = mechanism (type = (value >> 4) & 0x07, channel = value & 0x0F)
-//   type 0 = door
-//   type 1 = piston
+let roomCallbacks = {
+    rebuildGeometry: null,
+    refreshBuffers: null,
+    transitionOut: null
+};
 
-// Object type definitions (legacy, for rendering):
-// 0 = empty
-// 1 = red arrow (indicator)
-// 2 = pressure plate
-// 3 = green cube (exit/goal)
-// 4 = piston
+export function setRoomCallbacks(callbacks) {
+    roomCallbacks = { ...roomCallbacks, ...callbacks };
+}
 
 // Object colors by type
 const OBJECT_COLORS = {
@@ -47,7 +47,7 @@ const DOOR_COLOR_LOCKED = [0.8, 0.2, 0.2, 1.0];   // Red when locked
 const DOOR_COLOR_UNLOCKED = [0.2, 0.8, 0.6, 1.0]; // Green when unlocked
 
 // Load a level from BINARY file (new 162-byte format)
-async function loadLevel(levelPath) {
+export async function loadLevel(levelPath) {
     try {
         const response = await fetch(levelPath);
         if (!response.ok) {
@@ -88,7 +88,7 @@ async function loadLevel(levelPath) {
         let doorCol = 0;
 
         // Clear pistons before creating new ones
-        if (typeof clearPistons === 'function') {
+        if (clearPistons) {
             clearPistons();
         }
 
@@ -174,39 +174,39 @@ async function loadLevel(levelPath) {
 }
 
 // Get current level config
-function getCurrentLevel() {
+export function getCurrentLevel() {
     return currentLevel;
 }
 
 // Get level grid size
-function getLevelGridSize() {
+export function getLevelGridSize() {
     return GRID_SIZE;
 }
 
 // Get level cell size
-function getLevelCellSize() {
+export function getLevelCellSize() {
     return CELL_SIZE;
 }
 
 // Get level grid
-function getLevelGrid() {
+export function getLevelGrid() {
     return levelGrid;
 }
 
 // Get door config
-function getLevelDoorConfig() {
+export function getLevelDoorConfig() {
     return doorConfig;
 }
 
 // Get room half size (for collision bounds)
-function getLevelRoomHalf() {
+export function getLevelRoomHalf() {
     return (GRID_SIZE * CELL_SIZE) / 2;
 }
 
 // =============================================================================
 // DOOR COLLISION
 // =============================================================================
-function checkDoorCollision(playerX, playerZ) {
+export function checkDoorCollision(playerX, playerZ) {
 
     if (!doorConfig.wall) return false;
 
@@ -247,7 +247,7 @@ function checkDoorCollision(playerX, playerZ) {
 
 let isTransitioning = false;
 
-function updateDoorCollision() {
+export function updateDoorCollision() {
     if (isTransitioning) return false;
 
     const px = player.position[0];
@@ -275,8 +275,8 @@ function updateDoorCollision() {
                 // Clear ghosts for the new level
                 clearGhosts();
                 // Rebuild room geometry with new level data (will reset transition to -40)
-                if (window.rebuildRoomGeometry) {
-                    window.rebuildRoomGeometry();
+                if (roomCallbacks.rebuildGeometry) {
+                    roomCallbacks.rebuildGeometry();
                 }
                 // Reset player position for new level
                 resetPlayer();
@@ -287,8 +287,8 @@ function updateDoorCollision() {
             });
         };
 
-        if (window.transitionLevelOut) {
-            window.transitionLevelOut(loadNextLevel);
+        if (roomCallbacks.transitionOut) {
+            roomCallbacks.transitionOut(loadNextLevel);
         } else {
             loadNextLevel();
         }
@@ -302,7 +302,7 @@ function updateDoorCollision() {
 // =============================================================================
 
 // Update door lock based on channel activation
-function updateDoorLockState() {
+export function updateDoorLockState() {
     const channelActive = isChannelActive(doorChannel);
 
     // Unlock door when its channel is activated
@@ -314,8 +314,8 @@ function updateDoorLockState() {
         }
         console.log(`Door unlocked! Channel ${doorChannel} activated.`);
         // Rebuild room to update door visuals
-        if (window.refreshRoomBuffers) {
-            window.refreshRoomBuffers();
+        if (roomCallbacks.refreshBuffers) {
+            roomCallbacks.refreshBuffers();
         }
     } else if (!channelActive && !doorLocked) {
         // Re-lock door if channel is deactivated
@@ -325,19 +325,19 @@ function updateDoorLockState() {
         }
         console.log(`Door locked! Channel ${doorChannel} deactivated.`);
         // Rebuild room to update door visuals
-        if (window.refreshRoomBuffers) {
-            window.refreshRoomBuffers();
+        if (roomCallbacks.refreshBuffers) {
+            roomCallbacks.refreshBuffers();
         }
     }
 }
 
 // Check if door is currently locked
-function isDoorLocked() {
+export function isDoorLocked() {
     return doorLocked;
 }
 
 // Get current door color based on lock state
-function getCurrentDoorColor() {
+export function getCurrentDoorColor() {
     return doorLocked ? DOOR_COLOR_LOCKED : DOOR_COLOR_UNLOCKED;
 }
 
@@ -353,7 +353,7 @@ function gridToWorldCollision(row, col) {
 }
 
 // Handle player collision with level tiles (cubes)
-function handleLevelTileCollisions() {
+export function handleLevelTileCollisions() {
     if (!levelGrid) return;
 
     const cubeSize = CELL_SIZE;  // 2 units
@@ -465,7 +465,7 @@ function handleLevelTileCollisions() {
 // =============================================================================
 // GEOMETRY CREATION
 // =============================================================================
-function createRoomGeometry() {
+export function createRoomGeometry() {
 
     const roomHalf = getLevelRoomHalf();
 
@@ -698,7 +698,7 @@ function createRoomGeometry() {
 }
 
 // Create arrow geometry separately for animation
-function createArrowGeometry() {
+export function createArrowGeometry() {
     const positions = [];
     const colors = [];
     const normals = [];

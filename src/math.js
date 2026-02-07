@@ -2,11 +2,11 @@
 // MATH UTILITIES
 // =============================================================================
 // Pre-allocated matrices to avoid per-frame allocations
-const _viewMatrix = new Float32Array(16);
-const _projMatrix = new Float32Array(16);
-const _tempVec3 = new Float32Array(3);
+export const _viewMatrix = new Float32Array(16);
+export const _projMatrix = new Float32Array(16);
+export const _tempVec3 = new Float32Array(3);
 
-function mat4Perspective(out, fov, aspect, near, far) {
+export function mat4Perspective(out, fov, aspect, near, far) {
     const f = 1.0 / Math.tan(fov / 2);
     const nf = 1 / (near - far);
     out[0] = f / aspect; out[1] = 0; out[2] = 0; out[3] = 0;
@@ -15,7 +15,7 @@ function mat4Perspective(out, fov, aspect, near, far) {
     out[12] = 0; out[13] = 0; out[14] = 2 * far * near * nf; out[15] = 0;
 }
 
-function mat4Orthographic(out, left, right, bottom, top, near, far) {
+export function mat4Orthographic(out, left, right, bottom, top, near, far) {
     const lr = 1 / (left - right);
     const bt = 1 / (bottom - top);
     const nf = 1 / (near - far);
@@ -26,7 +26,7 @@ function mat4Orthographic(out, left, right, bottom, top, near, far) {
 }
 
 // Isometric view matrix - fixed camera looking at origin
-function mat4IsometricView(out) {
+export function mat4IsometricView(out) {
     // Isometric angles: 45° Y rotation, ~35.264° X tilt (arctan(1/sqrt(2)))
     const yaw = Math.PI / 4;      // 45 degrees
     const pitch = Math.atan(1 / Math.sqrt(2)); // ~35.264 degrees
@@ -43,21 +43,21 @@ function mat4IsometricView(out) {
     out[12] = 0; out[13] = 0; out[14] = -dist; out[15] = 1;
 }
 
-function mat4Identity(out) {
+export function mat4Identity(out) {
     out[0] = 1; out[1] = 0; out[2] = 0; out[3] = 0;
     out[4] = 0; out[5] = 1; out[6] = 0; out[7] = 0;
     out[8] = 0; out[9] = 0; out[10] = 1; out[11] = 0;
     out[12] = 0; out[13] = 0; out[14] = 0; out[15] = 1;
 }
 
-function mat4Translate(out, v) {
+export function mat4Translate(out, v) {
     out[12] += out[0] * v[0] + out[4] * v[1] + out[8] * v[2];
     out[13] += out[1] * v[0] + out[5] * v[1] + out[9] * v[2];
     out[14] += out[2] * v[0] + out[6] * v[1] + out[10] * v[2];
     out[15] += out[3] * v[0] + out[7] * v[1] + out[11] * v[2];
 }
 
-function mat4RotateX(out, rad) {
+export function mat4RotateX(out, rad) {
     const s = Math.sin(rad), c = Math.cos(rad);
     const a10 = out[4], a11 = out[5], a12 = out[6], a13 = out[7];
     const a20 = out[8], a21 = out[9], a22 = out[10], a23 = out[11];
@@ -67,7 +67,7 @@ function mat4RotateX(out, rad) {
     out[10] = a22 * c - a12 * s; out[11] = a23 * c - a13 * s;
 }
 
-function mat4RotateY(out, rad) {
+export function mat4RotateY(out, rad) {
     const s = Math.sin(rad), c = Math.cos(rad);
     const a00 = out[0], a01 = out[1], a02 = out[2], a03 = out[3];
     const a20 = out[8], a21 = out[9], a22 = out[10], a23 = out[11];
@@ -79,7 +79,7 @@ function mat4RotateY(out, rad) {
 
 // Calculate orthographic bounds to fit the room in isometric view
 // Returns the optimal viewSize to fit the room with the given margin
-function calculateIsometricFitBounds(roomSize, roomHeight, marginPercent = 0.15) {
+export function calculateIsometricFitBounds(roomSize, roomHeight, marginPercent = 0.15) {
     // Room bounds in world space (centered at origin)
     const halfSize = roomSize / 2;
 

@@ -1,3 +1,6 @@
+import { player } from './player.js';
+import { getGhosts, getGhostFrame } from './ghost.js';
+
 // =============================================================================
 // PRESSURE PLATE SYSTEM
 // =============================================================================
@@ -80,7 +83,7 @@ const levelFlags = {
 // =============================================================================
 
 // Create a pressure plate and register it
-function createPressurePlate(gridRow, gridCol, channel = 0) {
+export function createPressurePlate(gridRow, gridCol, channel = 0) {
     const plate = new PressurePlate(gridRow, gridCol, channel);
     pressurePlates.push(plate);
     levelFlags.plateCount++;
@@ -88,7 +91,7 @@ function createPressurePlate(gridRow, gridCol, channel = 0) {
 }
 
 // Clear all pressure plates (for level reset)
-function clearPressurePlates() {
+export function clearPressurePlates() {
     pressurePlates.length = 0;
     activeChannels.clear();
     levelFlags.plateCount = 0;
@@ -97,7 +100,7 @@ function clearPressurePlates() {
 }
 
 // Update all pressure plates and level flags
-function updatePressurePlates() {
+export function updatePressurePlates() {
     let pressedCount = 0;
     const previousChannels = new Set(activeChannels);
     activeChannels.clear();
@@ -127,17 +130,17 @@ function updatePressurePlates() {
 }
 
 // Get all pressure plates
-function getPressurePlates() {
+export function getPressurePlates() {
     return pressurePlates;
 }
 
 // Get level flags
-function getLevelFlags() {
+export function getLevelFlags() {
     return levelFlags;
 }
 
 // Check if a specific plate at grid position is pressed
-function isPlatePressed(gridRow, gridCol) {
+export function isPlatePressed(gridRow, gridCol) {
     for (const plate of pressurePlates) {
         if (plate.gridRow === gridRow && plate.gridCol === gridCol) {
             return plate.isPressed;
@@ -147,11 +150,11 @@ function isPlatePressed(gridRow, gridCol) {
 }
 
 // Check if a specific channel is active (at least one plate on channel is pressed)
-function isChannelActive(channel) {
+export function isChannelActive(channel) {
     return activeChannels.has(channel);
 }
 
 // Get all currently active channels
-function getActiveChannels() {
+export function getActiveChannels() {
     return Array.from(activeChannels);
 }

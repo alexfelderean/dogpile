@@ -1,3 +1,5 @@
+import { player, resetPlayer, getPlayerState, clampPlayerToRoom } from './player.js';
+
 // =============================================================================
 // GHOST ABILITY SYSTEM
 // =============================================================================
@@ -22,17 +24,17 @@ const timeLoop = {
 };
 
 // Pre-allocated model matrix for ghost rendering
-const _ghostModelMatrix = new Float32Array(16);
+export const _ghostModelMatrix = new Float32Array(16);
 
 // --- Time Loop Control ---
-function startTimeLoop(timestamp) {
+export function startTimeLoop(timestamp) {
     timeLoop.waitingForInput = false;
     timeLoop.startTime = timestamp;
     timeLoop.collisionStartTime = timestamp;
     timeLoop.lastRecordTime = 0;
 }
 
-function resetTimeLoop() {
+export function resetTimeLoop() {
     // Save current recording as a ghost
     if (currentRecording.length > 0) {
         ghosts.push({
@@ -64,7 +66,7 @@ function resetTimeLoop() {
     timeLoop.lastRecordTime = 0;
 }
 
-function setTimeLoopRunning(running) {
+export function setTimeLoopRunning(running) {
     timeLoop.isRunning = running;
     if (running) {
         timeLoop.waitingForInput = true;
@@ -74,16 +76,16 @@ function setTimeLoopRunning(running) {
     }
 }
 
-function isWaitingForInput() {
+export function isWaitingForInput() {
     return timeLoop.waitingForInput;
 }
 
-function isTimeLoopRunning() {
+export function isTimeLoopRunning() {
     return timeLoop.isRunning;
 }
 
 // --- Recording ---
-function recordFrame(timestamp) {
+export function recordFrame(timestamp) {
     if (!timeLoop.isRunning) return;
 
     if (timestamp - timeLoop.lastRecordTime >= timeLoop.recordInterval) {
@@ -138,7 +140,7 @@ function updateGhosts(elapsedTime) {
     }
 }
 
-function getGhostFrame(ghost) {
+export function getGhostFrame(ghost) {
     return ghost.interpolatedFrame || (ghost.frames.length > 0 ? ghost.frames[0] : null);
 }
 
@@ -258,6 +260,7 @@ function handleGhostCollisions(timestamp) {
 
     clampPlayerToRoom();
 }
+export { handleGhostCollisions };
 
 // --- UI Updates ---
 function updateTimerUI(elapsed) {
@@ -287,7 +290,7 @@ function updateGhostCountUI() {
 }
 
 // --- Time Loop Update (call each frame) ---
-function updateTimeLoop(timestamp) {
+export function updateTimeLoop(timestamp) {
     if (!timeLoop.isRunning) return;
 
     if (timeLoop.waitingForInput) {
@@ -304,7 +307,7 @@ function updateTimeLoop(timestamp) {
 }
 
 // --- Ghost Rendering ---
-function getGhostModelMatrix(out, x, y, z, yaw) {
+export function getGhostModelMatrix(out, x, y, z, yaw) {
     const c = Math.cos(yaw), s = Math.sin(yaw);
     out[0] = c; out[1] = 0; out[2] = s; out[3] = 0;
     out[4] = 0; out[5] = 1; out[6] = 0; out[7] = 0;
@@ -312,7 +315,7 @@ function getGhostModelMatrix(out, x, y, z, yaw) {
     out[12] = x; out[13] = y; out[14] = z; out[15] = 1;
 }
 
-function createGhostGeometry() {
+export function createGhostGeometry() {
     const positions = [];
     const colors = [];
     const normals = [];
@@ -357,7 +360,7 @@ function createGhostGeometry() {
     };
 }
 
-function createPlayerGeometry() {
+export function createPlayerGeometry() {
     const positions = [];
     const colors = [];
     const normals = [];
@@ -402,12 +405,12 @@ function createPlayerGeometry() {
     };
 }
 
-function getGhosts() {
+export function getGhosts() {
     return ghosts;
 }
 
 // Clear all ghosts and recording (for level transitions)
-function clearGhosts() {
+export function clearGhosts() {
     ghosts.length = 0;
     currentRecording = [];
     timeLoop.waitingForInput = true;
@@ -416,7 +419,7 @@ function clearGhosts() {
     updateGhostCountUI();
 }
 
-function getGhostModelMatrixForFrame(frame) {
+export function getGhostModelMatrixForFrame(frame) {
     getGhostModelMatrix(_ghostModelMatrix, frame.x, frame.y, frame.z, frame.yaw);
     return _ghostModelMatrix;
 }
