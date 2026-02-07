@@ -50,9 +50,6 @@ const doorConfig = {
     frameColor: [0.1, 0.1, 0.12, 1.0] // Dark frame
 };
 
-// Door collision state
-let doorCollisionLogged = false;
-
 // Check if player is colliding with the door
 function checkDoorCollision(playerX, playerZ) {
     if (!doorConfig.wall) return false;
@@ -80,14 +77,7 @@ function checkDoorCollision(playerX, playerZ) {
 function updateDoorCollision() {
     const isColliding = checkDoorCollision(player.position[0], player.position[2]);
 
-    if (isColliding && !doorCollisionLogged) {
-        console.log('Door collision detected!');
-        doorCollisionLogged = true;
-    } else if (!isColliding) {
-        doorCollisionLogged = false;
-    }
 
-    return isColliding;
 }
 
 // =============================================================================

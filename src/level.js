@@ -3,30 +3,7 @@
 // =============================================================================
 
 let currentLevel = null;
-
-// Default level configuration (used if no level loaded)
-const defaultLevel = {
-    name: "Default",
-    gridSize: 9,
-    cellSize: 2,
-    door: {
-        wall: 'x+',
-        width: 2.5,
-        height: 3.5,
-        color: [0.2, 0.8, 0.6, 1.0]
-    },
-    grid: [
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 1, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 1, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 2, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 2, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 3, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0]
-    ]
-};
+let levelLoaded = false;
 
 // Load a level from JSON file
 async function loadLevel(levelPath) {
@@ -36,37 +13,44 @@ async function loadLevel(levelPath) {
             throw new Error(`Failed to load level: ${response.status}`);
         }
         currentLevel = await response.json();
-        console.log(`Loaded level: ${currentLevel.name}`);
+        levelLoaded = true;
+        console.log(`Loaded level from ${levelPath}`);
         return currentLevel;
     } catch (error) {
         console.error('Error loading level:', error);
-        console.log('Using default level');
-        currentLevel = defaultLevel;
-        return currentLevel;
+        throw error;  // Re-throw to prevent game from starting without level
     }
+}
+
+// Check if level is loaded
+function isLevelLoaded() {
+    return levelLoaded && currentLevel !== null;
 }
 
 // Get current level config
 function getCurrentLevel() {
-    return currentLevel || defaultLevel;
+    if (!currentLevel) {
+        throw new Error('No level loaded! Call loadLevel() first.');
+    }
+    return currentLevel;
 }
 
 // Get level grid size
 function getLevelGridSize() {
     const level = getCurrentLevel();
-    return level.gridSize || 9;
+    return level.gridSize;
 }
 
 // Get level cell size
 function getLevelCellSize() {
     const level = getCurrentLevel();
-    return level.cellSize || 2;
+    return level.cellSize;
 }
 
 // Get level grid
 function getLevelGrid() {
     const level = getCurrentLevel();
-    return level.grid || defaultLevel.grid;
+    return level.grid;
 }
 
 // Get door config
@@ -83,4 +67,5 @@ function getLevelRoomHalf() {
 // Set level directly (for testing or editor)
 function setLevel(levelData) {
     currentLevel = levelData;
+    levelLoaded = true;
 }
