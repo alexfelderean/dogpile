@@ -113,11 +113,5 @@
             0,
             0
         ]
-    ],
-    "objectTypes": {
-        "0": "empty",
-        "1": "arrow",
-        "2": "pressurePlate",
-        "3": "exit"
-    }
+    ]
 }

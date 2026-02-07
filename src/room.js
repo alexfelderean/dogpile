@@ -318,13 +318,13 @@ function createRoomGeometry() {
             cx + tx1, tailTopY, cz + tz1
         );
         for (let i = 0; i < 4; i++) colors.push(...color);
-        indices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2, vertexOffset, vertexOffset + 2, vertexOffset + 3);
+        // indices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2, vertexOffset, vertexOffset + 2, vertexOffset + 3);
         // Same normal for tail quad
-        // for (let i = 0; i < 4; i++) normals.push(0.7071, 0, 0.7071);
-        // indices.push(
-        //     vertexOffset, vertexOffset + 1, vertexOffset + 2,
-        //     vertexOffset, vertexOffset + 2, vertexOffset + 3
-        // );
+        for (let i = 0; i < 4; i++) normals.push(0.7071, 0, 0.7071);
+        indices.push(
+            vertexOffset, vertexOffset + 1, vertexOffset + 2,
+            vertexOffset, vertexOffset + 2, vertexOffset + 3
+        );
         vertexOffset += 4;
     }
 
@@ -337,13 +337,13 @@ function createRoomGeometry() {
             const [worldX, worldZ] = gridToWorld(row, col);
             const color = OBJECT_COLORS[objectType] || [0.5, 0.5, 0.5, 1.0];
 
-            if (objectType === 1) {
+            if (objectType === 1) { // arrow
                 addArrow(worldX, worldZ, color);
-            } else if (objectType === 2) {
+            } else if (objectType === 2) { // pressure plate
                 createPressurePlate(row, col);
                 const plateSize = CELL_SIZE * 0.7;
                 addBox(worldX - plateSize / 2, 0.01, worldZ - plateSize / 2, plateSize, 0.08, plateSize, color);
-            } else {
+            } else { // cube
                 addBox(worldX - cubeSize / 2, 0, worldZ - cubeSize / 2, cubeSize, cubeHeight, cubeSize, color);
             }
         }
