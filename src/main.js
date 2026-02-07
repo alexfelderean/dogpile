@@ -25,7 +25,10 @@ const fsSource = `
 // =============================================================================
 // GAME INITIALIZATION
 // =============================================================================
-function main() {
+async function main() {
+    // Load level first
+    await loadLevel('levels/level1.json');
+
     const canvas = document.getElementById('glCanvas');
 
     let lastWidth = 0;
@@ -69,21 +72,46 @@ function main() {
         return;
     }
 
-    // Create geometry
-    const room = createRoomGeometry();
+    // Create geometry (level must be loaded first)
+    let room = createRoomGeometry();
     const ghostGeom = createGhostGeometry();
     const playerGeom = createPlayerGeometry();
 
+    // Track room index count (can change per level)
+    let indexCount = room.indexCount;
+
     // Room buffers
     const posBuf = gl.createBuffer();
+    const colBuf = gl.createBuffer();
+    const idxBuf = gl.createBuffer();
+
+    // Function to update room buffers (called when level changes)
+    function updateRoomBuffers() {
+        room = createRoomGeometry();
+        indexCount = room.indexCount;
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, room.positions, gl.STATIC_DRAW);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, colBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, room.colors, gl.STATIC_DRAW);
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, room.indices, gl.STATIC_DRAW);
+
+        console.log('Room buffers updated for new level');
+    }
+
+    // Make rebuildRoom available globally for level transitions
+    window.rebuildRoomGeometry = updateRoomBuffers;
+
+    // Initial buffer upload
     gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
     gl.bufferData(gl.ARRAY_BUFFER, room.positions, gl.STATIC_DRAW);
 
-    const colBuf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, colBuf);
     gl.bufferData(gl.ARRAY_BUFFER, room.colors, gl.STATIC_DRAW);
 
-    const idxBuf = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, room.indices, gl.STATIC_DRAW);
 
@@ -136,7 +164,7 @@ function main() {
     gl.enableVertexAttribArray(aPosition);
     gl.enableVertexAttribArray(aColor);
 
-    const indexCount = room.indexCount;
+    // indexCount is defined above and updated when level changes
     const ghostIndexCount = ghostGeom.indexCount;
     const playerIndexCount = playerGeom.indexCount;
 
