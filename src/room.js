@@ -19,7 +19,6 @@ const OBJECT_COLORS = {
 // LEVEL STATE (loaded from JSON)
 // =============================================================================
 let currentLevel = null;
-let levelLoaded = false;
 let levelNumber = 1;
 
 // Level properties (set after loading)
@@ -29,34 +28,69 @@ let ROOM_HEIGHT = 18;
 let levelGrid = [];
 let doorConfig = null;
 
-// Load a level from JSON file
+// Load a level from BINARY file
 async function loadLevel(levelPath) {
     try {
         const response = await fetch(levelPath);
         if (!response.ok) {
             throw new Error(`Failed to load level: ${response.status}`);
         }
-        currentLevel = await response.json();
 
-        // Set level properties from loaded data
-        GRID_SIZE = currentLevel.gridSize || 9;
-        CELL_SIZE = currentLevel.cellSize || 2;
+        // Read as ArrayBuffer for binary data
+        const buffer = await response.arrayBuffer();
+        const view = new Uint8Array(buffer);
+
+        // Initialize 9x9 grid with all zeros (dense array)
+        levelGrid = [];
+        for (let i = 0; i < 9; i++) {
+            levelGrid[i] = new Array(9).fill(0);
+        }
+
+        // Set constants
+        GRID_SIZE = 9;
+        CELL_SIZE = 2;
         ROOM_HEIGHT = GRID_SIZE * CELL_SIZE;
-        levelGrid = currentLevel.grid || [];
-        doorConfig = currentLevel.door || null;
 
-        levelLoaded = true;
-        console.log(`Loaded level from ${levelPath}`);
+        // Parse sparse binary data: [Index, Type, Index, Type, ...]
+        // Index is 0-80. Type is 0xA (arrow), 0xB (plate), 0xC (exit)
+        for (let i = 0; i < view.length; i += 2) {
+            // Safety check for incomplete pair
+            if (i + 1 >= view.length) break;
+
+            const index = view[i];
+            const typeHex = view[i + 1];
+
+            // Map hex types to internal types
+            let internalType = 0;
+            if (typeHex === 0x0A) internalType = 1;      // Arrow
+            else if (typeHex === 0x0B) internalType = 2; // Pressure Plate
+            else if (typeHex === 0x0C) internalType = 3; // Exit
+
+            // Convert linear index (0-80) to row/col
+            if (index >= 0 && index < 81) {
+                const row = Math.floor(index / 9);
+                const col = index % 9;
+                levelGrid[row][col] = internalType;
+            }
+        }
+
+        // Default door config (since binary doesn't contain it yet)
+        doorConfig = {
+            wall: "x+",
+            width: 2.5,
+            height: 3.5,
+            color: [0.2, 0.8, 0.6, 1.0]
+        };
+
+        // Store raw buffer as currentLevel (or wrapper)
+        currentLevel = { grid: levelGrid, door: doorConfig };
+
+        console.log(`Loaded binary level from ${levelPath}. Bytes: ${view.length}`);
         return currentLevel;
     } catch (error) {
         console.error('Error loading level:', error);
         throw error;
     }
-}
-
-// Check if level is loaded
-function isLevelLoaded() {
-    return levelLoaded && currentLevel !== null;
 }
 
 // Get current level config
@@ -140,7 +174,7 @@ function updateDoorCollision() {
 
         const loadNextLevel = () => {
             levelNumber++;
-            loadLevel("levels/level" + levelNumber + ".json").then(() => {
+            loadLevel("levels/l" + levelNumber).then(() => {
                 console.log('Level ' + levelNumber + ' loaded!');
                 // Rebuild room geometry with new level data (will reset transition to -40)
                 if (window.rebuildRoomGeometry) {
@@ -178,7 +212,7 @@ function gridToWorldCollision(row, col) {
 
 // Handle player collision with level tiles (cubes)
 function handleLevelTileCollisions() {
-    if (!levelLoaded || !levelGrid) return;
+    if (!levelGrid) return;
 
     const cubeSize = CELL_SIZE;  // 2 units
     const cubeHeight = CELL_SIZE;  // 2 units
@@ -270,9 +304,6 @@ function handleLevelTileCollisions() {
 // GEOMETRY CREATION
 // =============================================================================
 function createRoomGeometry() {
-    if (!levelLoaded) {
-        throw new Error('Cannot create room geometry - no level loaded!');
-    }
 
     const roomHalf = getLevelRoomHalf();
 
