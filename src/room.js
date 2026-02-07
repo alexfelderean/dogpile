@@ -131,6 +131,10 @@ async function loadLevel(levelPath) {
                     levelGrid[row][col] = 4; // New type for piston
                     console.log(`  Piston at index ${i} (row ${row}, col ${col}) channel ${channel}`);
                 }
+            } else if (entityByte === 32) {
+                // Arrow
+                levelGrid[row][col] = 1; // 1 = Arrow type (visual only)
+                console.log(`  Arrow at index ${i} (row ${row}, col ${col})`);
             }
         }
 
@@ -226,11 +230,15 @@ function checkDoorCollision(playerX, playerZ) {
 
     if (doorConfig.wall === 'z-') {
         const nearWall = playerZ <= -playerMaxPos;
-        const inDoorX = playerX > -dw && playerX < dw;
+        // Calculate door X center based on its column
+        const [doorX, _] = gridToWorldCollision(doorConfig.row, doorConfig.col);
+        const inDoorX = playerX > doorX - dw && playerX < doorX + dw;
         return nearWall && inDoorX;
     } else if (doorConfig.wall === 'x+') {
         const nearWall = playerX >= playerMaxPos;
-        const inDoorZ = playerZ > -dw && playerZ < dw;
+        // Calculate door Z center based on its row
+        const [_, doorZ] = gridToWorldCollision(doorConfig.row, doorConfig.col);
+        const inDoorZ = playerZ > doorZ - dw && playerZ < doorZ + dw;
         return nearWall && inDoorZ;
     }
 
@@ -557,12 +565,17 @@ function createRoomGeometry() {
             ? levelHeight[doorConfig.row][doorConfig.col] * CELL_SIZE
             : 0;
 
+        // Convert grid position to world position for door center
+        const [doorX, doorZ] = gridToWorld(doorConfig.row, doorConfig.col);
+
         if (doorConfig.wall === 'z-') {
             const z = -roomHalf + offset;
-            addQuad([-dw, doorBaseY, z], [-dw, doorBaseY + dh, z], [dw, doorBaseY + dh, z], [dw, doorBaseY, z], doorColor);
+            // Use doorX from grid position instead of 0 (center)
+            addQuad([doorX - dw, doorBaseY, z], [doorX - dw, doorBaseY + dh, z], [doorX + dw, doorBaseY + dh, z], [doorX + dw, doorBaseY, z], doorColor);
         } else if (doorConfig.wall === 'x+') {
             const x = roomHalf - offset;
-            addQuad([x, doorBaseY, -dw], [x, doorBaseY + dh, -dw], [x, doorBaseY + dh, dw], [x, doorBaseY, dw], doorColor);
+            // Use doorZ from grid position instead of 0 (center)
+            addQuad([x, doorBaseY, doorZ - dw], [x, doorBaseY + dh, doorZ - dw], [x, doorBaseY + dh, doorZ + dw], [x, doorBaseY, doorZ + dw], doorColor);
         }
     }
 
@@ -640,9 +653,7 @@ function createRoomGeometry() {
                 addBox(worldX - cubeSize / 2, 0, worldZ - cubeSize / 2, cubeSize, floorY, cubeSize, terrainColor);
             }
 
-            if (objectType === 1) { // arrow
-                addArrow(worldX, worldZ, color);
-            } else if (objectType === 2) { // pressure plate
+            if (objectType === 2) { // pressure plate
                 const channel = entityByte & 0x0F;
                 createPressurePlate(row, col, channel);
                 const plateSize = CELL_SIZE * 0.7;

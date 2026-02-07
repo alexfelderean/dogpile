@@ -18,8 +18,8 @@ REM Level 1: Simple door puzzle
 REM - Spawn at center (40)
 REM - Pressure plate at index 10 (top-left area), channel 0
 REM - Door at index 70 (bottom-right area), channel 0
-python hex_to_bin.py z "40s 10p0 70d0" l1
-echo L1: spawn=40, plate@10(ch0), door@70(ch0)
+python hex_to_bin.py z "40s 10p0 70d0 02a" l1
+echo L1: spawn=40, plate@10(ch0), door@70(ch0), arrow@01
 
 REM Level 2: Stairs to the door
 REM - Stairs on right wall going from bottom (height 0) to top (height 5)
