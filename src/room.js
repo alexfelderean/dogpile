@@ -133,22 +133,31 @@ function updateDoorCollision() {
     }
 
     if (isColliding) {
-        console.log('DOOR COLLISION! Loading next level...');
+        console.log('DOOR COLLISION! Starting transition...');
         isTransitioning = true;
-        levelNumber++;
-        loadLevel("levels/level" + levelNumber + ".json").then(() => {
-            console.log('Level ' + levelNumber + ' loaded!');
-            // Rebuild room geometry with new level data
-            if (window.rebuildRoomGeometry) {
-                window.rebuildRoomGeometry();
-            }
-            // Reset player position for new level
-            resetPlayer();
-            isTransitioning = false;
-        }).catch((err) => {
-            console.error('Failed to load level:', err);
-            isTransitioning = false;
-        });
+
+        const loadNextLevel = () => {
+            levelNumber++;
+            loadLevel("levels/level" + levelNumber + ".json").then(() => {
+                console.log('Level ' + levelNumber + ' loaded!');
+                // Rebuild room geometry with new level data (will reset transition to -40)
+                if (window.rebuildRoomGeometry) {
+                    window.rebuildRoomGeometry();
+                }
+                // Reset player position for new level
+                resetPlayer();
+                isTransitioning = false;
+            }).catch((err) => {
+                console.error('Failed to load level:', err);
+                isTransitioning = false;
+            });
+        };
+
+        if (window.transitionLevelOut) {
+            window.transitionLevelOut(loadNextLevel);
+        } else {
+            loadNextLevel();
+        }
     }
 
     return isColliding;
