@@ -13,7 +13,7 @@ export function createPressurePlate(gridRow, gridCol, channel = 0, height = 0) {
         worldX: (gridCol - GRID_SIZE / 2 + 0.5) * CELL_SIZE,
         worldZ: (gridRow - GRID_SIZE / 2 + 0.5) * CELL_SIZE,
         worldY: height * CELL_SIZE, // Height of the plate
-        radius: CELL_SIZE * 0.4,
+        radius: CELL_SIZE * 0.55,
         isPositionOnPlate(x, y, z) {
             // Check if Y position is near the plate (within 0.5 units above it)
             if (y < this.worldY - 0.1 || y > this.worldY + 0.5) return false;
