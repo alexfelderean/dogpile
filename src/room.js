@@ -135,6 +135,14 @@ export function updateDoorLockState() {
 export function isDoorLocked() { return doorLocked; }
 export function getCurrentDoorColor() { return doorLocked ? DOOR_COLOR_LOCKED : DOOR_COLOR_UNLOCKED; }
 
+export function resetDoorState() {
+    doorLocked = true;
+    if (doorConfig) {
+        doorConfig.color = DOOR_COLOR_LOCKED;
+    }
+    if (window.refreshRoomBuffers) window.refreshRoomBuffers();
+}
+
 export function handleLevelTileCollisions() {
     if (!levelGrid) return;
     const cubeSize = CELL_SIZE, cubeHeight = CELL_SIZE, playerRadius = 0.7;

@@ -1,5 +1,8 @@
 import { player, resetPlayer, getPlayerState, clampPlayerToRoom } from './player.js';
 import { playBark } from './audio.js';
+import { resetPressurePlates } from './pressureplate.js';
+import { resetPistons } from './piston.js';
+import { resetDoorState } from './room.js';
 
 const MAX_GHOSTS = 3;
 const ghosts = [];
@@ -28,6 +31,9 @@ export function resetTimeLoop() {
     }
     currentRecording = [];
     resetPlayer();
+    resetPressurePlates();
+    resetPistons();
+    resetDoorState();
     for (const ghost of ghosts) {
         ghost.currentFrame = 0;
         ghost.interpolatedFrame = ghost.frames.length > 0 ? ghost.frames[0] : null;

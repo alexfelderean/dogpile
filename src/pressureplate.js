@@ -46,6 +46,16 @@ export function clearPressurePlates() {
     levelFlags.allPlatesPressed = false;
 }
 
+export function resetPressurePlates() {
+    activeChannels.clear();
+    for (const plate of pressurePlates) {
+        plate.isPressed = false;
+        plate.wasPressed = false;
+    }
+    levelFlags.pressedCount = 0;
+    levelFlags.allPlatesPressed = false;
+}
+
 export function updatePressurePlates() {
     let pressedCount = 0;
     activeChannels.clear();

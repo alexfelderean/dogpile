@@ -35,6 +35,14 @@ export function createPiston(gridRow, gridCol, channel, baseHeight = 0) {
 
 export function clearPistons() { pistons.length = 0; }
 
+export function resetPistons() {
+    for (const piston of pistons) {
+        piston.isExtended = false;
+        piston.wasExtended = false;
+        piston.currentHeight = PISTON_MIN_HEIGHT;
+    }
+}
+
 export function updatePistons() {
     for (const piston of pistons) piston.update();
 }
