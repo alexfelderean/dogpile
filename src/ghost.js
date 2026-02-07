@@ -220,10 +220,41 @@ function handleGhostCollisions(timestamp) {
         }
     }
 
-    // If player is in the air and not standing on any ghost, make sure they fall
+    // If player is in the air and not standing on any ghost, check if they are standing on terrain
     if (!standingOnGhost && player.position[1] > 0 && !player.isJumping && player.velocityY === 0) {
-        player.isJumping = true;  // Re-enable gravity
+        // We need to check if we are standing on a tile (this function is in room.js)
+        // Since we can't easily call room.js local function from here without exposing it,
+        // we rely on the main loop calling handleLevelTileCollisions() AFTER this function.
+        // However, handleLevelTileCollisions handles the falling logic if not on a tile.
+        // So we just need to ensure we don't force a fall if we are on a tile.
+
+        // Actually, handleLevelTileCollisions will set isJumping = true if not on a tile.
+        // But if we set isJumping = true here, handleLevelTileCollisions might reset it if on a tile?
+        // Let's look at order: updatePlayer -> handleGhostCollisions -> handleLevelTileCollisions
+
+        // If we are here, we are NOT on a ghost.
+        // If we leave isJumping false, frame recording might define we are floating.
+        // But handleLevelTileCollisions will run next. 
+        // If handleLevelTileCollisions sees we are NOT on a tile, it will set isJumping = true.
+        // If it sees we ARE on a tile, it keeps isJumping = false (or sets it).
+
+        // The issue is if handleGhostCollisions pushes us OFF a ghost, we want to fall.
+        // But if we push off a ghost onto a raised platform, we shouldn't fall.
+
+        // Let's just trust handleLevelTileCollisions to handle gravity enablement.
+        // Removing the forced fall here allows room.js to decide.
+        // But wait, if we were standing on a ghost, standingOnGhost is true.
+        // If we slide off, standingOnGhost becomes false.
+        // Then we enter this block. 
+        // We SHOULD enable jumping (gravity) so we fall, UNLESS room.js says otherwise.
+
+        // So:
+        player.isJumping = true;
     }
+
+    // However, if we simply set isJumping=true, and then handleLevelTileCollisions runs,
+    // it will check if we are on a tile. If we are, it sets isJumping=false. 
+    // This seems correct.
 
     clampPlayerToRoom();
 }

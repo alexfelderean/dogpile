@@ -2,21 +2,31 @@
 // ROOM & LEVEL SYSTEM - Dynamic Level Loading
 // =============================================================================
 
-// Object type definitions:
+// Entity byte encoding:
+// 0 = empty
+// 1-15 = spawn location
+// 16-31 = pressure plate (channel = value & 0x0F)
+// 128+ = mechanism (type = (value >> 4) & 0x07, channel = value & 0x0F)
+//   type 0 = door
+//   type 1 = piston
+
+// Object type definitions (legacy, for rendering):
 // 0 = empty
 // 1 = red arrow (indicator)
 // 2 = pressure plate
 // 3 = green cube (exit/goal)
+// 4 = piston
 
 // Object colors by type
 const OBJECT_COLORS = {
     1: [0.9, 0.2, 0.2, 1.0],  // Red (arrow)
     2: [0.6, 0.5, 0.2, 1.0],  // Gold/bronze (pressure plate)
     3: [0.2, 0.9, 0.5, 1.0],  // Green (exit)
+    4: [0.5, 0.5, 0.6, 1.0],  // Gray (piston)
 };
 
 // =============================================================================
-// LEVEL STATE (loaded from JSON)
+// LEVEL STATE (loaded from binary)
 // =============================================================================
 let currentLevel = null;
 let levelNumber = 1;
@@ -26,16 +36,17 @@ let GRID_SIZE = 9;
 let CELL_SIZE = 2;
 let ROOM_HEIGHT = 18;
 let levelGrid = [];
+let levelHeight = [];     // Height map H[81]
+let levelEntities = [];   // Entity map E[81]
 let doorConfig = null;
-
-// Door lock state
-let doorLocked = true;
+let doorChannel = 0;      // Channel for door activation
+let doorLocked = true;    // Door lock state
 
 // Door colors
 const DOOR_COLOR_LOCKED = [0.8, 0.2, 0.2, 1.0];   // Red when locked
 const DOOR_COLOR_UNLOCKED = [0.2, 0.8, 0.6, 1.0]; // Green when unlocked
 
-// Load a level from BINARY file
+// Load a level from BINARY file (new 162-byte format)
 async function loadLevel(levelPath) {
     try {
         const response = await fetch(levelPath);
@@ -47,10 +58,14 @@ async function loadLevel(levelPath) {
         const buffer = await response.arrayBuffer();
         const view = new Uint8Array(buffer);
 
-        // Initialize 9x9 grid with all zeros (dense array)
+        // Initialize 9x9 grids
         levelGrid = [];
+        levelHeight = [];
+        levelEntities = [];
         for (let i = 0; i < 9; i++) {
             levelGrid[i] = new Array(9).fill(0);
+            levelHeight[i] = new Array(9).fill(0);
+            levelEntities[i] = new Array(9).fill(0);
         }
 
         // Set constants
@@ -58,60 +73,93 @@ async function loadLevel(levelPath) {
         CELL_SIZE = 2;
         ROOM_HEIGHT = GRID_SIZE * CELL_SIZE;
 
-        // Parse Header
-        // Byte 0: Door Wall (0=z-, 1=x+)
-        const doorWallByte = view[0];
-        const doorWall = (doorWallByte === 1) ? 'x+' : 'z-';
+        // Parse 162-byte format: H[81] + E[81]
+        // Height map: bytes 0-80
+        for (let i = 0; i < 81; i++) {
+            const row = Math.floor(i / 9);
+            const col = i % 9;
+            levelHeight[row][col] = view[i] || 0;
+        }
 
-        // Byte 1: Spawn Index
-        const spawnIndex = view[1];
-        const spawnRow = Math.floor(spawnIndex / 9);
-        const spawnCol = spawnIndex % 9;
+        // Entity map: bytes 81-161
+        let spawnIndex = 40; // Default center spawn
+        let doorWall = 'z-'; // Default door wall
+        let doorRow = 0;
+        let doorCol = 0;
 
-        // Convert spawn grid to world positions
-        const roomHalf = (GRID_SIZE * CELL_SIZE) / 2;
-        const spawnX = (spawnCol * CELL_SIZE) - roomHalf + (CELL_SIZE / 2);
-        const spawnZ = (spawnRow * CELL_SIZE) - roomHalf + (CELL_SIZE / 2);
+        // Clear pistons before creating new ones
+        if (typeof clearPistons === 'function') {
+            clearPistons();
+        }
 
-        // Parse sparse binary data: [Index, Type, Index, Type, ...]
-        // Start at index 2 (skip header)
-        for (let i = 2; i < view.length; i += 2) {
-            // Safety check for incomplete pair
-            if (i + 1 >= view.length) break;
+        for (let i = 0; i < 81; i++) {
+            const entityByte = view[81 + i] || 0;
+            const row = Math.floor(i / 9);
+            const col = i % 9;
+            levelEntities[row][col] = entityByte;
 
-            const index = view[i];
-            const typeHex = view[i + 1];
+            if (entityByte === 0) {
+                // Empty cell
+                levelGrid[row][col] = 0;
+            } else if (entityByte >= 1 && entityByte <= 15) {
+                // Spawn location (value = spawn variant, 1 = default)
+                spawnIndex = i;
+                levelGrid[row][col] = 0; // Spawn is walkable
+                console.log(`  Spawn at index ${i} (row ${row}, col ${col})`);
+            } else if (entityByte >= 16 && entityByte <= 31) {
+                // Pressure plate (channel = low 4 bits)
+                const channel = entityByte & 0x0F;
+                levelGrid[row][col] = 2; // Legacy type for rendering
+                console.log(`  Pressure plate at index ${i} (row ${row}, col ${col}) channel ${channel}`);
+                // Note: pressure plate creation happens in createRoomGeometry
+            } else if (entityByte >= 128) {
+                // Mechanism (bit 7 = 1)
+                const mechType = (entityByte >> 4) & 0x07;
+                const channel = entityByte & 0x0F;
 
-            // Map hex types to internal types
-            let internalType = 0;
-            if (typeHex === 0x0A) internalType = 1;      // Arrow
-            else if (typeHex === 0x0B) internalType = 2; // Pressure Plate
-            else if (typeHex === 0x0C) internalType = 3; // Exit
-
-            // Convert linear index (0-80) to row/col
-            if (index >= 0 && index < 81) {
-                const row = Math.floor(index / 9);
-                const col = index % 9;
-                levelGrid[row][col] = internalType;
+                if (mechType === 0) {
+                    // Door mechanism
+                    doorWall = (col > 4) ? 'x+' : 'z-';
+                    doorRow = row;
+                    doorCol = col;
+                    doorChannel = channel;
+                    levelGrid[row][col] = 0;
+                    console.log(`  Door at index ${i} (row ${row}, col ${col}) channel ${channel}, wall ${doorWall}`);
+                } else if (mechType === 1) {
+                    // Piston mechanism - create logic object immediately
+                    createPiston(row, col, channel);
+                    levelGrid[row][col] = 4; // New type for piston
+                    console.log(`  Piston at index ${i} (row ${row}, col ${col}) channel ${channel}`);
+                }
             }
         }
 
+        // Calculate spawn position
+        const spawnRow = Math.floor(spawnIndex / 9);
+        const spawnCol = spawnIndex % 9;
+        const roomHalf = (GRID_SIZE * CELL_SIZE) / 2;
+        const spawnX = (spawnCol * CELL_SIZE) - roomHalf + (CELL_SIZE / 2);
+        const spawnZ = (spawnRow * CELL_SIZE) - roomHalf + (CELL_SIZE / 2);
+        const spawnY = levelHeight[spawnRow][spawnCol] * CELL_SIZE;
+
         doorConfig = {
+            row: doorRow,
+            col: doorCol,
             wall: doorWall,
             width: 2.5,
             height: 3.5,
-            color: DOOR_COLOR_LOCKED  // Start locked (red)
+            color: DOOR_COLOR_LOCKED
         };
 
         // Reset door lock state for new level
         doorLocked = true;
 
-        // Set player spawn (using global function from player.js)
-        setPlayerSpawn(spawnX, 0, spawnZ);
+        // Set player spawn
+        setPlayerSpawn(spawnX, spawnY, spawnZ);
         resetPlayer();
 
-        // Store raw buffer as currentLevel (or wrapper)
-        currentLevel = { grid: levelGrid, door: doorConfig };
+        // Store current level
+        currentLevel = { grid: levelGrid, door: doorConfig, height: levelHeight, entities: levelEntities };
 
         console.log(`Loaded binary level from ${levelPath}. Bytes: ${view.length}`);
         return currentLevel;
@@ -166,6 +214,15 @@ function checkDoorCollision(playerX, playerZ) {
     const playerHalf = 0.7;  // Player cube half-size
     // Player stops at (roomHalf - margin - playerHalf), so check based on that
     const playerMaxPos = 8.7 - playerHalf;  // 8.0
+
+    // Check vertical alignment (player must be at door level)
+    const doorBaseY = (levelHeight[doorConfig.row] && levelHeight[doorConfig.row][doorConfig.col])
+        ? levelHeight[doorConfig.row][doorConfig.col] * CELL_SIZE
+        : 0;
+    const playerY = player.position[1];
+
+    // Allow some tolerance for stairs/ramps (approx player height + step)
+    if (Math.abs(playerY - doorBaseY) > 2.0) return false;
 
     if (doorConfig.wall === 'z-') {
         const nearWall = playerZ <= -playerMaxPos;
@@ -236,29 +293,29 @@ function updateDoorCollision() {
 // DOOR LOCK STATE
 // =============================================================================
 
-// Update door lock based on pressure plate state
+// Update door lock based on channel activation
 function updateDoorLockState() {
-    const flags = getLevelFlags();
+    const channelActive = isChannelActive(doorChannel);
 
-    // Unlock door when all pressure plates are pressed
-    if (flags.allPlatesPressed && doorLocked) {
+    // Unlock door when its channel is activated
+    if (channelActive && doorLocked) {
         doorLocked = false;
         // Update door color to unlocked
         if (doorConfig) {
             doorConfig.color = DOOR_COLOR_UNLOCKED;
         }
-        console.log('Door unlocked! All pressure plates activated.');
+        console.log(`Door unlocked! Channel ${doorChannel} activated.`);
         // Rebuild room to update door visuals
         if (window.refreshRoomBuffers) {
             window.refreshRoomBuffers();
         }
-    } else if (!flags.allPlatesPressed && !doorLocked && flags.plateCount > 0) {
-        // Re-lock door if plates are released
+    } else if (!channelActive && !doorLocked) {
+        // Re-lock door if channel is deactivated
         doorLocked = true;
         if (doorConfig) {
             doorConfig.color = DOOR_COLOR_LOCKED;
         }
-        console.log('Door locked! Pressure plates released.');
+        console.log(`Door locked! Channel ${doorChannel} deactivated.`);
         // Rebuild room to update door visuals
         if (window.refreshRoomBuffers) {
             window.refreshRoomBuffers();
@@ -300,11 +357,30 @@ function handleLevelTileCollisions() {
     for (let row = 0; row < GRID_SIZE; row++) {
         for (let col = 0; col < GRID_SIZE; col++) {
             const objectType = levelGrid[row] ? levelGrid[row][col] : 0;
-            // Only collide with cube tiles (type 3 and above, not empty/arrow/pressure plate)
-            if (objectType < 3) continue;
+            const height = levelHeight[row] ? levelHeight[row][col] : 0;
+
+            // If empty and no height, skip
+            if (objectType === 0 && height === 0) continue;
+
+            // If it's just a non-colliding object (like arrow/spawn) on flat ground, skip
+            // Objects < 3 are non-solid unless they have height
+            if (objectType < 3 && height === 0) continue;
 
             const [tileX, tileZ] = gridToWorldCollision(row, col);
             const tileHalf = cubeSize / 2;
+
+            // Calculate collision box height
+            // Base terrain height
+            let collisionHeight = height * CELL_SIZE;
+
+            // Add object height if it's a solid block (type 3=cube, 4=piston)
+            if (objectType === 3) {
+                collisionHeight += cubeHeight; // Cube sits on top of terrain
+            } else if (objectType === 4) {
+                // For pistons, we might need special handling, but for now treat base as solid
+                // Piston logic handles its own extension collision usually, but let's at least collide with base
+                collisionHeight += 0.5; // Piston base
+            }
 
             // Check if player is within the tile's horizontal bounds
             const playerX = player.position[0];
@@ -323,8 +399,9 @@ function handleLevelTileCollisions() {
 
             if (inHorizontalBounds) {
                 // Check for landing on top
-                if (playerY >= cubeHeight - 0.3 && playerY <= cubeHeight + 0.5 && player.velocityY <= 0) {
-                    // More strict check for being above the tile
+                // Allow landing if player is falling and feet are near the top
+                if (playerY >= collisionHeight - 0.3 && playerY <= collisionHeight + 0.5 && player.velocityY <= 0) {
+                    // More strict check for being directly above the tile (center-to-center)
                     const strictMinX = tileX - tileHalf - playerRadius * 0.8;
                     const strictMaxX = tileX + tileHalf + playerRadius * 0.8;
                     const strictMinZ = tileZ - tileHalf - playerRadius * 0.8;
@@ -332,8 +409,8 @@ function handleLevelTileCollisions() {
 
                     if (playerX > strictMinX && playerX < strictMaxX &&
                         playerZ > strictMinZ && playerZ < strictMaxZ) {
-                        // Land on top of tile
-                        player.position[1] = cubeHeight;
+                        // Land on top
+                        player.position[1] = collisionHeight;
                         player.velocityY = 0;
                         player.isJumping = false;
                         standingOnTile = true;
@@ -342,7 +419,7 @@ function handleLevelTileCollisions() {
                 }
 
                 // Horizontal collision (only if player is below the top of the tile)
-                if (playerY < cubeHeight - 0.1) {
+                if (playerY < collisionHeight - 0.1) {
                     // Find the closest edge and push player out
                     const overlapLeft = maxX - playerX;
                     const overlapRight = playerX - minX;
@@ -475,12 +552,17 @@ function createRoomGeometry() {
         const offset = 0.02;
         const doorColor = doorConfig.color || [0.2, 0.8, 0.6, 1.0];
 
+        // Get door base height from its grid position
+        const doorBaseY = (levelHeight[doorConfig.row] && levelHeight[doorConfig.row][doorConfig.col])
+            ? levelHeight[doorConfig.row][doorConfig.col] * CELL_SIZE
+            : 0;
+
         if (doorConfig.wall === 'z-') {
             const z = -roomHalf + offset;
-            addQuad([-dw, 0, z], [-dw, dh, z], [dw, dh, z], [dw, 0, z], doorColor);
+            addQuad([-dw, doorBaseY, z], [-dw, doorBaseY + dh, z], [dw, doorBaseY + dh, z], [dw, doorBaseY, z], doorColor);
         } else if (doorConfig.wall === 'x+') {
             const x = roomHalf - offset;
-            addQuad([x, 0, -dw], [x, dh, -dw], [x, dh, dw], [x, 0, dw], doorColor);
+            addQuad([x, doorBaseY, -dw], [x, doorBaseY + dh, -dw], [x, doorBaseY + dh, dw], [x, doorBaseY, dw], doorColor);
         }
     }
 
@@ -543,19 +625,54 @@ function createRoomGeometry() {
     for (let row = 0; row < GRID_SIZE; row++) {
         for (let col = 0; col < GRID_SIZE; col++) {
             const objectType = levelGrid[row] ? levelGrid[row][col] : 0;
-            if (objectType === 0) continue;
+            const entityByte = levelEntities[row] ? levelEntities[row][col] : 0;
+            const height = levelHeight[row] ? levelHeight[row][col] : 0;
+
+            if (objectType === 0 && height === 0) continue;
 
             const [worldX, worldZ] = gridToWorld(row, col);
+            const floorY = height * CELL_SIZE;
             const color = OBJECT_COLORS[objectType] || [0.5, 0.5, 0.5, 1.0];
+
+            // Render height-based terrain
+            if (height > 0) {
+                const terrainColor = [0.45, 0.47, 0.52, 1.0];
+                addBox(worldX - cubeSize / 2, 0, worldZ - cubeSize / 2, cubeSize, floorY, cubeSize, terrainColor);
+            }
 
             if (objectType === 1) { // arrow
                 addArrow(worldX, worldZ, color);
             } else if (objectType === 2) { // pressure plate
-                createPressurePlate(row, col);
+                const channel = entityByte & 0x0F;
+                createPressurePlate(row, col, channel);
                 const plateSize = CELL_SIZE * 0.7;
-                addBox(worldX - plateSize / 2, 0.01, worldZ - plateSize / 2, plateSize, 0.08, plateSize, color);
-            } else { // cube
-                addBox(worldX - cubeSize / 2, 0, worldZ - cubeSize / 2, cubeSize, cubeHeight, cubeSize, color);
+                addBox(worldX - plateSize / 2, floorY + 0.01, worldZ - plateSize / 2, plateSize, 0.08, plateSize, color);
+            } else if (objectType === 4) { // piston
+                // Piston logic object is created in loadLevel, just render here
+                const piston = getPistonAt(row, col);
+                const isExtended = piston ? piston.isExtended : false;
+
+                // Brighter piston colors
+                // Base: lighter gray
+                const baseColor = [0.6, 0.6, 0.7, 1.0];
+                // Head: brighter color when extended
+                const headColor = isExtended ? [0.7, 0.7, 0.8, 1.0] : baseColor;
+
+                if (isExtended) {
+                    // Extended: Base (0.5) + Shaft (1.0) + Head (0.5) = 2.0 total height
+                    // Base
+                    addBox(worldX - cubeSize / 2, floorY, worldZ - cubeSize / 2, cubeSize, 0.5, cubeSize, baseColor);
+                    // Shaft (narrower)
+                    const shaftSize = cubeSize * 0.6;
+                    addBox(worldX - shaftSize / 2, floorY + 0.5, worldZ - shaftSize / 2, shaftSize, 1.0, shaftSize, [0.4, 0.4, 0.5, 1.0]);
+                    // Head
+                    addBox(worldX - cubeSize / 2, floorY + 1.5, worldZ - cubeSize / 2, cubeSize, 0.5, cubeSize, headColor);
+                } else {
+                    // Retracted: Just the base/head flush with floor (height 0.5)
+                    addBox(worldX - cubeSize / 2, floorY, worldZ - cubeSize / 2, cubeSize, 0.5, cubeSize, baseColor);
+                }
+            } else if (objectType === 3) { // cube (exit)
+                addBox(worldX - cubeSize / 2, floorY, worldZ - cubeSize / 2, cubeSize, cubeHeight, cubeSize, color);
             }
         }
     }

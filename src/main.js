@@ -357,7 +357,11 @@ async function main() {
             // Update pressure plates
             updatePressurePlates();
 
-            // Update door lock state based on pressure plates
+            // Update pistons based on channel activation
+            updatePistons();
+            handlePistonCollisions();
+
+            // Update door lock state based on channel activation
             updateDoorLockState();
 
             // Check door collision
